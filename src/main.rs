@@ -11,7 +11,7 @@ use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
 use notify_rust::Notification;
-use htmlentity::entity::{ decode, ICodedDataTrait };
+use htmlentity::entity::{decode, ICodedDataTrait};
 
 fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     let mut keys = pressed_keys.lock().unwrap();
@@ -23,7 +23,7 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
                 let filename = capture_screenshot().expect("Couldn't capture screenshot.");
                 let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
                 let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-                let (translated_text, detected_source_language)  = runtime.block_on(translate_text(origin_text, "fr")).expect("Couldn't translate text.");
+                let (translated_text, detected_source_language) = runtime.block_on(translate_text(origin_text, "fr")).expect("Couldn't translate text.");
                 let notification = format_notification(&translated_text, detected_source_language);
                 send_notification("Translated Text", &notification).expect("Failed to send notification");
             }
@@ -74,27 +74,34 @@ fn execute_ocr(filename: String) -> Option<String> {
     println!("Starting Tesseract OCR...");
     let ocr_result = "ocr_result";
     let ocr_result_txt = ocr_result.to_owned() + ".txt";
-    println!("Test 1");
-    let output = Command::new("tesseract")
+    println!("Filename: {}, OCR result: {}", filename, ocr_result);
+    thread::sleep(Duration::from_millis(150));
+    let output_result = Command::new("tesseract")
         .arg(filename.to_owned())
-        .arg(ocr_result)
-        .output()
-        .expect("Failed to execute command");
-    println!("Test 2");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    println!("Standard Output: {}", stdout);
-    eprintln!("Standard Error: {}", stderr);
-    if !output.status.success() {
-        eprintln!("Command executed with failing error code");
-        None
-    } else {
-        println!("Tesseract executed successfully. Result:");
-        let content = std::fs::read_to_string(ocr_result_txt.to_owned()).expect("Couldn't read file.");
-        println!("{}", content);
-        std::fs::remove_file(filename).expect("Couldn't delete file.");
-        std::fs::remove_file(ocr_result_txt).expect("Couldn't delete file.");
-        Some(content)
+        .arg(ocr_result.to_owned())
+        .output();
+    println!("Tesseract over.");
+    match output_result {
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("Standard Error: {}", stderr);
+                None
+            } else {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                println!("Standard Output: {}", stdout);
+                println!("Tesseract executed successfully. Result:");
+                let content = std::fs::read_to_string(ocr_result_txt.to_owned()).expect("Couldn't read file.");
+                println!("{}", content);
+                std::fs::remove_file(filename).expect("Couldn't delete file.");
+                std::fs::remove_file(ocr_result_txt).expect("Couldn't delete file.");
+                Some(content)
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to execute command: {:?}", e);
+            None
+        }
     }
 }
 
