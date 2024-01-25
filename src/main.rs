@@ -1,3 +1,5 @@
+mod translation_response;
+
 use rdev::{listen, Event, EventType, Key};
 use std::collections::HashSet;
 use std::process::Command;
@@ -5,6 +7,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use chrono::Local;
+use reqwest;
+use serde_json::json;
+use translation_response::TranslationResponse;
 
 fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     let mut keys = pressed_keys.lock().unwrap();
@@ -14,7 +19,13 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
             if keys.contains(&Key::ControlLeft) && keys.contains(&Key::KeyG) {
                 println!("Ctrl+G pressed!");
                 let filename = capture_screenshot().expect("Couldn't capture screenshot.");
-                execute_ocr(filename);
+                let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
+                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
+                let (translated_text, detected_source_language)  = runtime.block_on(translate_text(origin_text, "fr")).expect("Couldn't translate text.");
+                println!("{:?}", translated_text);
+                if detected_source_language.is_some() {
+                    println!("\n[Detected Source Language: {:?}]", detected_source_language.unwrap());
+                }
             }
         }
         EventType::KeyRelease(key) => {
@@ -59,7 +70,7 @@ fn capture_screenshot() -> Option<String> {
     }
 }
 
-fn execute_ocr(filename: String) {
+fn execute_ocr(filename: String) -> Option<String> {
     let ocr_result = "ocr_result";
     let ocr_result_txt = ocr_result.to_owned() + ".txt";
     let output = Command::new("tesseract")
@@ -67,19 +78,45 @@ fn execute_ocr(filename: String) {
         .arg(ocr_result)
         .output()
         .expect("Failed to execute command");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    println!("Standard Output: {}", stdout);
+    eprintln!("Standard Error: {}", stderr);
     if !output.status.success() {
         eprintln!("Command executed with failing error code");
+        None
     } else {
         println!("Tesseract executed successfully. Result:");
         let content = std::fs::read_to_string(ocr_result_txt.to_owned()).expect("Couldn't read file.");
         println!("{}", content);
         std::fs::remove_file(filename).expect("Couldn't delete file.");
         std::fs::remove_file(ocr_result_txt).expect("Couldn't delete file.");
+        Some(content)
     }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    println!("Standard Output: {}", stdout);
-    eprintln!("Standard Error: {}", stderr);
+}
+
+async fn translate_text(text: String, target_language: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
+    let api_key = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A"; // Replace with your API key
+    let url = format!("https://translation.googleapis.com/language/translate/v2?key={}", api_key);
+
+    println!("Calling Google Translate...");
+    let response = reqwest::Client::new()
+        .post(&url)
+        .json(&json!({
+            "q": text,
+            "target": target_language
+        }))
+        .send()
+        .await?;
+    let response_body = response.text().await?;
+    println!("Received response: {}", response_body);
+    let translation_response: TranslationResponse = serde_json::from_str(&response_body)?;
+
+    if let Some(translation) = translation_response.data.translations.get(0) {
+        Ok((translation.translatedText.clone(), translation.detectedSourceLanguage.clone()))
+    } else {
+        Err("No translation found".into())
+    }
 }
 
 
