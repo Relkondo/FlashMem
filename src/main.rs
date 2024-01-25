@@ -10,6 +10,7 @@ use chrono::Local;
 use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
+use notify_rust::Notification;
 
 fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     let mut keys = pressed_keys.lock().unwrap();
@@ -22,10 +23,8 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
                 let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
                 let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
                 let (translated_text, detected_source_language)  = runtime.block_on(translate_text(origin_text, "fr")).expect("Couldn't translate text.");
-                println!("{:?}", translated_text);
-                if detected_source_language.is_some() {
-                    println!("\n[Detected Source Language: {:?}]", detected_source_language.unwrap());
-                }
+                let notification = format_notification(&translated_text, detected_source_language);
+                send_notification("Translated Text", &notification).expect("Failed to send notification");
             }
         }
         EventType::KeyRelease(key) => {
@@ -71,13 +70,16 @@ fn capture_screenshot() -> Option<String> {
 }
 
 fn execute_ocr(filename: String) -> Option<String> {
+    println!("Starting Tesseract OCR...");
     let ocr_result = "ocr_result";
     let ocr_result_txt = ocr_result.to_owned() + ".txt";
+    println!("Test 1");
     let output = Command::new("tesseract")
         .arg(filename.to_owned())
         .arg(ocr_result)
         .output()
         .expect("Failed to execute command");
+    println!("Test 2");
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     println!("Standard Output: {}", stdout);
@@ -109,9 +111,9 @@ async fn translate_text(text: String, target_language: &str) -> Result<(String, 
         .send()
         .await?;
     let response_body = response.text().await?;
-    println!("Received response: {}", response_body);
+    println!("Received response:\n{}", response_body);
+    println!("Extracting json...");
     let translation_response: TranslationResponse = serde_json::from_str(&response_body)?;
-
     if let Some(translation) = translation_response.data.translations.get(0) {
         Ok((translation.translatedText.clone(), translation.detectedSourceLanguage.clone()))
     } else {
@@ -119,6 +121,23 @@ async fn translate_text(text: String, target_language: &str) -> Result<(String, 
     }
 }
 
+fn format_notification(translated_text: &str, detected_source_language: Option<String>) -> String {
+    let mut notification = translated_text.to_owned();
+    if let Some(source_language) = detected_source_language {
+        notification.push_str(&format!("\n[Detected Source Language: {:?}]", source_language));
+    }
+    notification
+}
+
+fn send_notification(summary: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Sending the following notification:\n{}\n{}", summary, body);
+    Notification::new()
+        .summary(summary)
+        .body(body)
+        .show()?;
+    println!("Notification sent.");
+    Ok(())
+}
 
 fn main() {
     let pressed_keys = Arc::new(Mutex::new(HashSet::new()));
