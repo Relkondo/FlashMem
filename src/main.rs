@@ -1,5 +1,6 @@
 use rdev::{listen, Event, EventType, Key};
 use std::collections::HashSet;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -12,7 +13,8 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
             keys.insert(key);
             if keys.contains(&Key::ControlLeft) && keys.contains(&Key::KeyG) {
                 println!("Ctrl+G pressed!");
-                capture_screenshot();
+                let filename = capture_screenshot().expect("Couldn't capture screenshot.");
+                execute_ocr(filename);
             }
         }
         EventType::KeyRelease(key) => {
@@ -22,7 +24,7 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     }
 }
 
-fn capture_screenshot() {
+fn capture_screenshot() -> Option<String> {
     // Screenshot capturing logic as before
     let display = scrap::Display::primary().expect("Couldn't find primary display.");
     let mut capturer = scrap::Capturer::new(display).expect("Couldn't begin capture.");
@@ -43,18 +45,41 @@ fn capture_screenshot() {
                 encoder.set_depth(png::BitDepth::Eight); // Set the bit depth
                 encoder.write_header().unwrap().write_image_data(&image_data).expect("Couldn't write image data.");
                 println!("Screenshot saved as {}", filename);
-                break;
+                return Some(filename);
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::WouldBlock {
                     thread::sleep(Duration::from_millis(100));
                 } else {
                     println!("Error: {}", error);
-                    break;
+                    return None;
                 }
             }
         }
     }
+}
+
+fn execute_ocr(filename: String) {
+    let ocr_result = "ocr_result";
+    let ocr_result_txt = ocr_result.to_owned() + ".txt";
+    let output = Command::new("tesseract")
+        .arg(filename.to_owned())
+        .arg(ocr_result)
+        .output()
+        .expect("Failed to execute command");
+    if !output.status.success() {
+        eprintln!("Command executed with failing error code");
+    } else {
+        println!("Tesseract executed successfully. Result:");
+        let content = std::fs::read_to_string(ocr_result_txt.to_owned()).expect("Couldn't read file.");
+        println!("{}", content);
+        std::fs::remove_file(filename).expect("Couldn't delete file.");
+        std::fs::remove_file(ocr_result_txt).expect("Couldn't delete file.");
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    println!("Standard Output: {}", stdout);
+    eprintln!("Standard Error: {}", stderr);
 }
 
 
