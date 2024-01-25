@@ -11,6 +11,7 @@ use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
 use notify_rust::Notification;
+use htmlentity::entity::{ decode, ICodedDataTrait };
 
 fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     let mut keys = pressed_keys.lock().unwrap();
@@ -115,7 +116,11 @@ async fn translate_text(text: String, target_language: &str) -> Result<(String, 
     println!("Extracting json...");
     let translation_response: TranslationResponse = serde_json::from_str(&response_body)?;
     if let Some(translation) = translation_response.data.translations.get(0) {
-        Ok((translation.translatedText.clone(), translation.detectedSourceLanguage.clone()))
+        println!("Decoding...");
+        let bytes = translation.translatedText.to_owned().into_bytes();
+        let decoded_response = decode(&bytes).to_string().expect("Couldn't decode response.");
+        println!("Decoded translation: {}", decoded_response);
+        Ok((decoded_response.clone(), translation.detectedSourceLanguage.clone()))
     } else {
         Err("No translation found".into())
     }
