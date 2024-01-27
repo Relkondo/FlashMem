@@ -12,6 +12,12 @@ use serde_json::json;
 use translation_response::TranslationResponse;
 use notify_rust::Notification;
 use htmlentity::entity::{decode, ICodedDataTrait};
+use image::{GenericImageView};
+
+static TITLE: &'static str = "FlashMem Translated Sub";
+static FOOTER_START: &'static str = "[Detected Source Language:";
+static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
+static CROPPED_PATH: &'static str = "assets/cropped/";
 
 fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     let mut keys = pressed_keys.lock().unwrap();
@@ -21,11 +27,12 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
             if keys.contains(&Key::ControlLeft) && keys.contains(&Key::KeyG) {
                 println!("Ctrl+G pressed!");
                 let filename = capture_screenshot().expect("Couldn't capture screenshot.");
-                let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
+                let cropped_file = crop_image(filename.as_str());
+                let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
                 let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
                 let (translated_text, detected_source_language) = runtime.block_on(translate_text(origin_text, "fr")).expect("Couldn't translate text.");
                 let notification = format_notification(&translated_text, detected_source_language);
-                send_notification("Translated Text", &notification).expect("Failed to send notification");
+                send_notification(TITLE, &notification).expect("Failed to send notification");
             }
         }
         EventType::KeyRelease(key) => {
@@ -35,8 +42,18 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     }
 }
 
+fn crop_image(image_path: &str) -> String {
+    let mut img = image::open(image_path).expect("Failed to open image");
+    let (width, height) = img.dimensions();
+    let top = (height as f64 * 0.60) as u32;
+    let crop_height = (height as f64 * 0.35) as u32;
+    let cropped_image = img.crop(0, top, width, crop_height);
+    let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
+    cropped_image.save(cropped_filename.to_owned()).unwrap();
+    cropped_filename
+}
+
 fn capture_screenshot() -> Option<String> {
-    // Screenshot capturing logic as before
     let display = scrap::Display::primary().expect("Couldn't find primary display.");
     let mut capturer = scrap::Capturer::new(display).expect("Couldn't begin capture.");
     let (w, h) = (capturer.width(), capturer.height());
@@ -49,7 +66,7 @@ fn capture_screenshot() -> Option<String> {
                     // Convert BGRA to RGBA
                     image_data.extend_from_slice(&[chunk[2], chunk[1], chunk[0], chunk[3]]);
                 }
-                let filename = format!("screenshot_{}.png", Local::now().format("%Y%m%d_%H%M%S"));
+                let filename = format!( "{}screenshot_{}.png", SCREENSHOT_PATH, Local::now().format("%Y%m%d_%H%M%S"));
                 let mut file = std::fs::File::create(&filename).expect("Couldn't create file.");
                 let mut encoder = png::Encoder::new(&mut file, w as u32, h as u32);
                 encoder.set_color(png::ColorType::Rgba); // Set the color type to RGBA
@@ -88,8 +105,6 @@ fn execute_ocr(filename: String) -> Option<String> {
                 eprintln!("Standard Error: {}", stderr);
                 None
             } else {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                println!("Standard Output: {}", stdout);
                 println!("Tesseract executed successfully. Result:");
                 let content = std::fs::read_to_string(ocr_result_txt.to_owned()).expect("Couldn't read file.");
                 println!("{}", content);
@@ -136,7 +151,7 @@ async fn translate_text(text: String, target_language: &str) -> Result<(String, 
 fn format_notification(translated_text: &str, detected_source_language: Option<String>) -> String {
     let mut notification = translated_text.to_owned();
     if let Some(source_language) = detected_source_language {
-        notification.push_str(&format!("\n[Detected Source Language: {:?}]", source_language));
+        notification.push_str(&format!("\n{} {:?}]", FOOTER_START, source_language));
     }
     notification
 }
@@ -159,3 +174,13 @@ fn main() {
         Err(e) => println!("Error: {:?}", e),
     }
 }
+
+// fn cropping_all_images_test() {
+//     let mut files = std::fs::read_dir(SCREENSHOT_PATH).unwrap();
+//     while let Some(file) = files.next() {
+//         let filename = file.unwrap().path().display().to_string();
+//         if filename.contains("screenshot") {
+//             crop_image(filename.as_str());
+//         }
+//     }
+// }
