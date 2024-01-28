@@ -1,6 +1,4 @@
-mod translation_response;
-
-use rdev::{listen, Event, EventType, Key};
+use rdev::{Event, EventType, Key, listen};
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -12,8 +10,10 @@ use serde_json::json;
 use translation_response::TranslationResponse;
 use notify_rust::Notification;
 use htmlentity::entity::{decode, ICodedDataTrait};
-use image::{GenericImageView};
+use image::GenericImageView;
 use regex::Regex;
+
+mod translation_response;
 
 static TITLE: &'static str = "FlashMem Translated Sub";
 static FOOTER_START: &'static str = "[Detected Source Language:";
@@ -239,7 +239,7 @@ fn send_notification(summary: &str, body: &str) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-fn main() {
+fn execute() {
     let pressed_keys = Arc::new(Mutex::new(HashSet::new()));
     let pressed_keys_clone = Arc::clone(&pressed_keys);
     match listen(move |event| handle_event(event, &pressed_keys_clone)) {
