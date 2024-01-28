@@ -711,6 +711,7 @@ dependencies = [
  "notify-rust",
  "png",
  "rdev",
+ "regex",
  "reqwest",
  "scrap",
  "serde",

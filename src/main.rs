@@ -13,6 +13,7 @@ use translation_response::TranslationResponse;
 use notify_rust::Notification;
 use htmlentity::entity::{decode, ICodedDataTrait};
 use image::{GenericImageView};
+use regex::Regex;
 
 static TITLE: &'static str = "FlashMem Translated Sub";
 static FOOTER_START: &'static str = "[Detected Source Language:";
@@ -29,9 +30,10 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
                 let filename = capture_screenshot().expect("Couldn't capture screenshot.");
                 let cropped_file = crop_image(filename.as_str());
                 let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
+                let formatted_text = format_text(origin_text);
                 let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-                let (translated_text, detected_source_language) = runtime.block_on(translate_text(origin_text.clone(), "fr")).expect("Couldn't translate text.");
-                let clean_translation = truncate_translation(&origin_text, &translated_text);
+                let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), "fr")).expect("Couldn't translate text.");
+                let clean_translation = truncate_translation(&formatted_text, &translated_text);
                 let notification = format_notification(&clean_translation, detected_source_language);
                 send_notification(TITLE, &notification).expect("Failed to send notification");
             }
@@ -81,7 +83,7 @@ fn crop_image(image_path: &str) -> String {
     let mut img = image::open(image_path).expect("Failed to open image");
     let (width, height) = img.dimensions();
     let top = (height as f64 * 0.6) as u32;
-    let crop_height = (height as f64 * 0.4) as u32;
+    let crop_height = (height as f64 * 0.35) as u32;
     let cropped_image = img.crop(0, top, width, crop_height);
     let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
     cropped_image.save(cropped_filename.to_owned()).unwrap();
@@ -122,6 +124,43 @@ fn execute_ocr(filename: String) -> Option<String> {
     }
 }
 
+fn valid_end_sentence(text: &str) -> bool {
+    text.ends_with('.') || text.ends_with('!') || text.ends_with('?') || text.ends_with(':')
+}
+
+fn line_is_invalid(text: &str) -> bool {
+    text.contains("©") || text.contains("®") || text.contains("™") ||
+        text.contains("&") || text.chars().all(|c| c.is_numeric()) ||
+        !text.chars().any(|c| c.is_alphabetic()) ||
+        (text.len() < 5 && !valid_end_sentence(text))
+}
+
+fn is_valid_time_format(time: &str) -> bool {
+    let re = Regex::new(r"^\d{2}:\d{2}$").unwrap();
+    re.is_match(time) && time.trim().split(':').all(|part| part.parse::<u32>().is_ok())
+}
+
+fn format_text(text: String) -> String {
+    println!("Checking for noise...");
+    let lines = text.split("\n").map(|line| line.trim()).collect::<Vec<&str>>();
+    let mut result = String::new();
+    let mut i = 0;
+    while i < lines.len() && (line_is_invalid(lines[i]) || lines[i].is_empty()) {
+        i += 1;
+    }
+    while i < lines.len() && !is_valid_time_format(lines[i]) {
+        if !line_is_invalid(lines[i]) {
+            result.push_str(&*lines[i].replace('|', "I"));
+            result.push('\n');
+        } else if i + 1 < lines.len() && lines[i + 1].is_empty() {
+            i += 1;
+        }
+        i += 1;
+    }
+    println!("Text after cleaning: {}", result);
+    result
+}
+
 async fn translate_text(text: String, target_language: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
     let api_key = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A"; // Replace with your API key
     let url = format!("https://translation.googleapis.com/language/translate/v2?key={}", api_key);
@@ -151,7 +190,7 @@ async fn translate_text(text: String, target_language: &str) -> Result<(String, 
 }
 
 fn truncate_translation(untranslated: &str, translated: &str) -> String {
-    println!("Checking for noise...");
+    println!("Checking again for noise by comparing translations...");
     let untranslated_words: Vec<&str> = untranslated.split_whitespace().collect();
     let translated_words: Vec<&str> = translated.split_whitespace().collect();
     let mut matching_sequence = 0;
