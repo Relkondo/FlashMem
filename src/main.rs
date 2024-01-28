@@ -30,8 +30,9 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
                 let cropped_file = crop_image(filename.as_str());
                 let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
                 let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-                let (translated_text, detected_source_language) = runtime.block_on(translate_text(origin_text, "fr")).expect("Couldn't translate text.");
-                let notification = format_notification(&translated_text, detected_source_language);
+                let (translated_text, detected_source_language) = runtime.block_on(translate_text(origin_text.clone(), "fr")).expect("Couldn't translate text.");
+                let clean_translation = truncate_translation(&origin_text, &translated_text);
+                let notification = format_notification(&clean_translation, detected_source_language);
                 send_notification(TITLE, &notification).expect("Failed to send notification");
             }
         }
@@ -40,17 +41,6 @@ fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
         }
         _ => (),
     }
-}
-
-fn crop_image(image_path: &str) -> String {
-    let mut img = image::open(image_path).expect("Failed to open image");
-    let (width, height) = img.dimensions();
-    let top = (height as f64 * 0.60) as u32;
-    let crop_height = (height as f64 * 0.35) as u32;
-    let cropped_image = img.crop(0, top, width, crop_height);
-    let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
-    cropped_image.save(cropped_filename.to_owned()).unwrap();
-    cropped_filename
 }
 
 fn capture_screenshot() -> Option<String> {
@@ -85,6 +75,18 @@ fn capture_screenshot() -> Option<String> {
             }
         }
     }
+}
+
+fn crop_image(image_path: &str) -> String {
+    let mut img = image::open(image_path).expect("Failed to open image");
+    let (width, height) = img.dimensions();
+    let top = (height as f64 * 0.6) as u32;
+    let crop_height = (height as f64 * 0.4) as u32;
+    let cropped_image = img.crop(0, top, width, crop_height);
+    let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
+    cropped_image.save(cropped_filename.to_owned()).unwrap();
+    std::fs::remove_file(image_path).expect("Couldn't delete file.");
+    cropped_filename
 }
 
 fn execute_ocr(filename: String) -> Option<String> {
@@ -146,6 +148,38 @@ async fn translate_text(text: String, target_language: &str) -> Result<(String, 
     } else {
         Err("No translation found".into())
     }
+}
+
+fn truncate_translation(untranslated: &str, translated: &str) -> String {
+    println!("Checking for noise...");
+    let untranslated_words: Vec<&str> = untranslated.split_whitespace().collect();
+    let translated_words: Vec<&str> = translated.split_whitespace().collect();
+    let mut matching_sequence = 0;
+    let mut result = String::new();
+    let limit = 4;
+
+    for word in &translated_words {
+        if untranslated_words.contains(word) {
+            matching_sequence += 1;
+            if matching_sequence < limit {
+                result.push_str(word);
+                result.push(' ');
+            } else if matching_sequence == limit {
+                println!("Truncating noise at \"{}\" (removing previous {} words)...", word, limit);
+                for _ in 0..(limit - 1) {
+                    if let Some(non_matching_word) = result.split_whitespace().next_back() {
+                        result.truncate(result.len() - non_matching_word.len() - 1);
+                    }
+                }
+                return result.trim_end().to_string();
+            }
+        } else {
+            matching_sequence = 0;
+            result.push_str(word);
+            result.push(' ');
+        }
+    }
+    result.trim_end().to_string()
 }
 
 fn format_notification(translated_text: &str, detected_source_language: Option<String>) -> String {
