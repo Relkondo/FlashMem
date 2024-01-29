@@ -18,7 +18,7 @@ tauri-build = { version = "1.5.1", features = [] }
 tauri = { version = "1.5.4", features = [] }
 device_query = "1.1.3"
 scrap = "0.5.0"
-rdev = "0.5.3"
+rdev = { git = "https://github.com/fufesou/rdev" }
 png = "0.17.11"
 chrono = "0.4.32"
 reqwest = { version = "0.11.23", features = ["json"] }
@@ -29,6 +29,7 @@ notify-rust = "4.10.0"
 htmlentity = "1.3.1"
 image = "0.24.8"
 regex = "1.10.3"
+lazy_static = { version = "1.4.0", features = [] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

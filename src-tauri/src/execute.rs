@@ -1,4 +1,4 @@
-use rdev::{Event, EventType, Key, listen};
+use rdev::{Event, EventType, Key};
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -20,7 +20,7 @@ static FOOTER_START: &'static str = "[Detected Source Language:";
 static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
 
-fn handle_event(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
+pub(crate) fn execute(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
     let mut keys = pressed_keys.lock().unwrap();
     match event.event_type {
         EventType::KeyPress(key) => {
@@ -93,7 +93,7 @@ fn crop_image(image_path: &str) -> String {
 
 fn execute_ocr(filename: String) -> Option<String> {
     println!("Starting Tesseract OCR...");
-    let ocr_result = "ocr_result";
+    let ocr_result = "assets/ocr_result";
     let ocr_result_txt = ocr_result.to_owned() + ".txt";
     println!("Filename: {}, OCR result: {}", filename, ocr_result);
     thread::sleep(Duration::from_millis(150));
@@ -237,15 +237,6 @@ fn send_notification(summary: &str, body: &str) -> Result<(), Box<dyn std::error
         .show()?;
     println!("Notification sent.");
     Ok(())
-}
-
-fn execute() {
-    let pressed_keys = Arc::new(Mutex::new(HashSet::new()));
-    let pressed_keys_clone = Arc::clone(&pressed_keys);
-    match listen(move |event| handle_event(event, &pressed_keys_clone)) {
-        Ok(_) => println!("Listening for global keyboard events..."),
-        Err(e) => println!("Error: {:?}", e),
-    }
 }
 
 // fn cropping_all_images_test() {
