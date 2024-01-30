@@ -5,9 +5,9 @@
 
 	async function handle_click() {
 		if (running) {
-			await invoke('stop');
+			await invoke('stop_listening');
 		} else {
-			await invoke('start');
+			await invoke('start_listening');
 		}
 		running = !running;
 	}

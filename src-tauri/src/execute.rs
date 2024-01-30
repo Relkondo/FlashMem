@@ -21,28 +21,16 @@ static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
 
 pub(crate) fn execute(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
-    let mut keys = pressed_keys.lock().unwrap();
-    match event.event_type {
-        EventType::KeyPress(key) => {
-            keys.insert(key);
-            if keys.contains(&Key::ControlLeft) && keys.contains(&Key::KeyG) {
-                println!("Ctrl+G pressed!");
-                let filename = capture_screenshot().expect("Couldn't capture screenshot.");
-                let cropped_file = crop_image(filename.as_str());
-                let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
-                let formatted_text = format_text(origin_text);
-                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-                let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), "fr")).expect("Couldn't translate text.");
-                let clean_translation = truncate_translation(&formatted_text, &translated_text);
-                let notification = format_notification(&clean_translation, detected_source_language);
-                send_notification(TITLE, &notification).expect("Failed to send notification");
-            }
-        }
-        EventType::KeyRelease(key) => {
-            keys.remove(&key);
-        }
-        _ => (),
-    }
+    println!("Executing FlashMem...");
+    let filename = capture_screenshot().expect("Couldn't capture screenshot.");
+    let cropped_file = crop_image(filename.as_str());
+    let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
+    let formatted_text = format_text(origin_text);
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
+    let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), "fr")).expect("Couldn't translate text.");
+    let clean_translation = truncate_translation(&formatted_text, &translated_text);
+    let notification = format_notification(&clean_translation, detected_source_language);
+    send_notification(TITLE, &notification).expect("Failed to send notification");
 }
 
 fn capture_screenshot() -> Option<String> {

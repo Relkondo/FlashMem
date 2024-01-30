@@ -4,50 +4,64 @@
 use std::collections::HashSet;
 use tauri::generate_context;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use rdev::{simulate, EventType, listen};
+use rdev::{EventType, Key, listen};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 
 mod execute;
 
 static IS_LISTENING: AtomicBool = AtomicBool::new(false);
+static IS_RUNNING: AtomicBool = AtomicBool::new(false);
 
 fn main() {
-  tauri::Builder::default()
-      .invoke_handler(tauri::generate_handler![start, stop, greet])
-      .run(generate_context!())
-      .expect("error while running tauri application");
+    open_listening_channel();
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![start_listening, stop_listening, greet])
+        .run(generate_context!())
+        .expect("error while running tauri application");
+}
+
+fn open_listening_channel() {
+    thread::spawn(move || {
+        println!("Opening global keyboard events listening channel...");
+        let pressed_keys = Arc::new(Mutex::new(HashSet::new()));
+        match listen(move |event| {
+            let mut keys = pressed_keys.lock().unwrap();
+            match event.event_type {
+                EventType::KeyPress(key) => {
+                    keys.insert(key);
+                    if keys.contains(&Key::ControlLeft) && keys.contains(&Key::KeyG) {
+                        println!("Ctrl+G pressed!");
+                        if IS_LISTENING.load(Ordering::SeqCst) && !IS_RUNNING.load(Ordering::SeqCst) {
+                            IS_RUNNING.store(true, Ordering::SeqCst);
+                            execute::execute(event, &pressed_keys);
+                            IS_RUNNING.store(false, Ordering::SeqCst);
+                        }
+                    }
+                }
+                EventType::KeyRelease(key) => {
+                    keys.remove(&key);
+                }
+                _ => (),
+            }
+        }) {
+            Ok(_) => println!("Channel for global keyboard events opened."),
+            Err(e) => println!("Error while opening: {:?}", e),
+        }
+    });
 }
 
 #[tauri::command]
-fn start() {
-  IS_LISTENING.store(true, Ordering::SeqCst);
-  thread::spawn(move || {
-    let pressed_keys = Arc::new(Mutex::new(HashSet::new()));
-    let pressed_keys_clone = Arc::clone(&pressed_keys);
-      println!("Thread spawned.");
-    match listen(move |event| {
-      if IS_LISTENING.load(Ordering::SeqCst) {
-        execute::execute(event, &pressed_keys_clone);
-      } else {
-        println!("Stop received");
-        return;
-      }
-    }) {
-      Ok(_) => println!("Listening for global keyboard events..."),
-      Err(e) => println!("Error: {:?}", e),
-    }
-    println!("Passed listen.");
-  });
+fn start_listening() {
+    IS_LISTENING.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]
-fn stop() {
-  IS_LISTENING.store(false, Ordering::SeqCst);
-  simulate(&EventType::KeyPress(rdev::Key::ControlRight)).unwrap();
+fn stop_listening() {
+    IS_LISTENING.store(false, Ordering::SeqCst);
 }
 
 #[tauri::command]
 fn greet(name: &str) -> String {
-  format!("Hello, {}!", name)
+    format!("Hello, {}!", name)
 }
