@@ -34,7 +34,7 @@ fn open_listening_channel() {
                         println!("Ctrl+G pressed!");
                         if IS_LISTENING.load(Ordering::SeqCst) && !IS_RUNNING.load(Ordering::SeqCst) {
                             IS_RUNNING.store(true, Ordering::SeqCst);
-                            execute::execute(event, &pressed_keys);
+                            execute::execute();
                             IS_RUNNING.store(false, Ordering::SeqCst);
                         }
                     }

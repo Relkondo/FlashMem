@@ -1,7 +1,4 @@
-use rdev::{Event, EventType, Key};
-use std::collections::HashSet;
 use std::process::Command;
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use chrono::Local;
@@ -20,7 +17,7 @@ static FOOTER_START: &'static str = "[Detected Source Language:";
 static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
 
-pub(crate) fn execute(event: Event, pressed_keys: &Arc<Mutex<HashSet<Key>>>) {
+pub(crate) fn execute() {
     println!("Executing FlashMem...");
     let filename = capture_screenshot().expect("Couldn't capture screenshot.");
     let cropped_file = crop_image(filename.as_str());
