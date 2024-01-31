@@ -1,34 +1,60 @@
 <script>
 	import { invoke } from '@tauri-apps/api/tauri'
-	import { register } from '@tauri-apps/api/globalShortcut';
+	import { register, unregisterAll } from '@tauri-apps/api/globalShortcut';
 	import { onMount } from 'svelte';
+	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
 
-	let running = false;
+	let activated = false;
+	const TITLE = "FlashMem Translated Sub";
 
 	onMount(async () => {
-		console.log('Registering shortcut...');
+		await toggle_activation();
+	});
+
+	async function register_shortcut() {
 		try {
-			await register('Ctrl+G', () => {
-				console.log('Ctrl+G pressed');
-				invoke('execute');
-			});
+			await register('Ctrl+G', execute);
 			console.log('Shortcut Ctrl+G registered');
 		} catch (error) {
 			console.error('Error registering shortcut:', error);
 		}
-	});
+	}
 
-	async function handle_click() {
-		if (running) {
-			await invoke('deactivate');
+	async function execute() {
+		console.log('Ctrl+G pressed');
+		let notification = await invoke('execute');
+		if (notification !== "###-Already Running-###") {
+			console.log('Sending notification...');
+			await send_notification(TITLE, notification);
 		} else {
-			await invoke('activate');
+			console.log('Cannot send notification, previous notification still in progress...');
 		}
-		running = !running;
+	}
+
+	/** @param {string} title
+	 *  @param {string} notification */
+	async function send_notification(title, notification) {
+		let permissionGranted = await isPermissionGranted();
+		if (!permissionGranted) {
+			const permission = await requestPermission();
+			permissionGranted = permission === 'granted';
+		}
+		if (permissionGranted) {
+			sendNotification({ title: title, body: notification });
+		}
+	}
+
+	async function toggle_activation() {
+		if (activated) {
+			await unregisterAll();
+		} else {
+			await register_shortcut()
+		}
+		activated = !activated;
 	}
 
 </script>
 
 <div>
-	<button on:click="{handle_click}">{running ? "Stop FlashMem" : "Start FlashMem"}</button>
+	<button on:click="{toggle_activation}">{activated ? "Stop FlashMem" : "Start FlashMem"}</button>
 </div>

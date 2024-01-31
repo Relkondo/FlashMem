@@ -5,19 +5,16 @@ use chrono::Local;
 use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
-use notify_rust::Notification;
 use htmlentity::entity::{decode, ICodedDataTrait};
 use image::GenericImageView;
 use regex::Regex;
 
 mod translation_response;
-
-static TITLE: &'static str = "FlashMem Translated Sub";
 static FOOTER_START: &'static str = "[Detected Source Language:";
 static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
 
-pub(crate) fn execute() {
+pub(crate) fn execute() -> String {
     println!("Executing FlashMem...");
     let filename = capture_screenshot().expect("Couldn't capture screenshot.");
     let cropped_file = crop_image(filename.as_str());
@@ -26,8 +23,9 @@ pub(crate) fn execute() {
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), "fr")).expect("Couldn't translate text.");
     let clean_translation = truncate_translation(&formatted_text, &translated_text);
-    let notification = format_notification(&clean_translation, detected_source_language);
-    send_notification(TITLE, &notification).expect("Failed to send notification");
+    let notification =  format_notification(&clean_translation, detected_source_language);
+    println!("Sending the following notification:\n{}", notification);
+    notification
 }
 
 fn capture_screenshot() -> Option<String> {
@@ -214,15 +212,15 @@ fn format_notification(translated_text: &str, detected_source_language: Option<S
     notification
 }
 
-fn send_notification(summary: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Sending the following notification:\n{}\n{}", summary, body);
-    Notification::new()
-        .summary(summary)
-        .body(body)
-        .show()?;
-    println!("Notification sent.");
-    Ok(())
-}
+// fn send_notification(summary: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
+//     println!("Sending the following notification:\n{}\n{}", summary, body);
+//     Notification::new()
+//         .summary(summary)
+//         .body(body)
+//         .show()?;
+//     println!("Notification sent.");
+//     Ok(())
+// }
 
 // fn cropping_all_images_test() {
 //     let mut files = std::fs::read_dir(SCREENSHOT_PATH).unwrap();
