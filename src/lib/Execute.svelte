@@ -56,5 +56,7 @@
 </script>
 
 <div>
-	<button on:click="{toggle_activation}">{activated ? "Stop FlashMem" : "Start FlashMem"}</button>
+	<button class="px-6 py-2 rounded-full text-white font-bold transition-colors duration-150
+         bg-green-600 hover:bg-green-700 focus:outline-none focus:ring focus:ring-green-800"
+					on:click="{toggle_activation}">{activated ? "Stop FlashMem" : "Start FlashMem"}</button>
 </div>
