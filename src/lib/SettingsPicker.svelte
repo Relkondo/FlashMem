@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-
-	let languages = ['English', 'French', 'Spanish', 'German', 'Italian'];
-	let search = 'English';
+	export let items: string[] = [];
+	export let label = '';
+	export let placeholder = '';
+	export let defaultPick = '';
+	let search = defaultPick;
 	let showList = false;
 	let dropdownElement: HTMLDivElement;
 
-	$: filteredLanguages = languages.filter(lang =>
-		lang.toLowerCase().includes(search.toLowerCase())
+	$: filteredItems = items.filter(i =>
+		i.toLowerCase().includes(search.toLowerCase())
 	);
 
 	onMount(() => {
@@ -18,14 +20,14 @@
 		document.removeEventListener('click', handleClickOutside);
 	});
 
-	function selectLanguage(lang: string) {
-		search = lang;
+	function selectItem(item: string) {
+		search = item;
 		showList = false;
 	}
 
 	function closeDropdown() {
 		showList = false;
-		if (!filteredLanguages.includes(search)) {
+		if (!filteredItems.includes(search)) {
 			search = 'English';
 		}
 	}
@@ -42,11 +44,11 @@
 	}
 </script>
 <div bind:this={dropdownElement} class="flex items-center bg-gray-800 space-x-3 p-3 rounded-md h-14" on:blur={closeDropdown} tabindex="-1">
-		<label for="search" class="text-white w-1/4">Translate to...</label>
+		<label for="search" class="text-white w-1/4">{label}</label>
 		<div class="relative w-1/2">
 			<input
 				type="text"
-				placeholder="Pick a target language..."
+				placeholder="{placeholder}"
 				bind:value={search}
 				class="bg-gray-700 w-full text-white px-4 py-2 rounded"
 				on:focus={() => showList = true}
@@ -54,8 +56,8 @@
 			/>
 			{#if showList}
 				<div class="absolute flex flex-col w-full bg-gray-700 max-h-60 overflow-auto rounded-b-md z-50">
-					{#each filteredLanguages as language}
-						<button class="text-white text-left p-2 hover:bg-green-600 cursor-pointer" on:click={() => selectLanguage(language)}>{language}</button>
+					{#each filteredItems as item}
+						<button class="text-white text-left p-2 hover:bg-green-600 cursor-pointer" on:click={() => selectItem(item)}>{item}</button>
 					{/each}
 				</div>
 			{/if}
