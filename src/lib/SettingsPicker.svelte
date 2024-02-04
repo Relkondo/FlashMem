@@ -1,9 +1,12 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+	import { invoke } from '@tauri-apps/api/tauri';
+	const dispatch = createEventDispatcher();
 	export let items: string[] = [];
 	export let label = '';
 	export let placeholder = '';
 	export let defaultPick = '';
+	export let command= '';
 	let search = defaultPick;
 	let showList = false;
 	let dropdownElement: HTMLDivElement;
@@ -23,6 +26,13 @@
 	function selectItem(item: string) {
 		search = item;
 		showList = false;
+	  if (command === 'set_shortcut') {
+			dispatch('shortcutSelected', { shortcut: item });
+		} else if (command !== '') {
+			invoke(command, { value: item })
+				.then(() => console.log(`${command}: ${item}`))
+				.catch((err) => console.error(`Failed to ${command}: ${err}`));
+		}
 	}
 
 	function closeDropdown() {

@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::sync::MutexGuard;
 use std::thread;
 use std::time::Duration;
 use chrono::Local;
@@ -8,20 +9,22 @@ use translation_response::TranslationResponse;
 use htmlentity::entity::{decode, ICodedDataTrait};
 use image::GenericImageView;
 use regex::Regex;
+use crate::SettingsState;
+use crate::utils::get_language_code;
 
 mod translation_response;
 static FOOTER_START: &'static str = "[Detected Source Language:";
 static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
 
-pub(crate) fn execute() -> String {
+pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
     let filename = capture_screenshot().expect("Couldn't capture screenshot.");
     let cropped_file = crop_image(filename.as_str());
     let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text);
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-    let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), "fr")).expect("Couldn't translate text.");
+    let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
     let clean_translation = truncate_translation(&formatted_text, &translated_text);
     let notification =  format_notification(&clean_translation, detected_source_language);
     println!("Sending the following notification:\n{}", notification);
@@ -211,23 +214,3 @@ fn format_notification(translated_text: &str, detected_source_language: Option<S
     }
     notification
 }
-
-// fn send_notification(summary: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
-//     println!("Sending the following notification:\n{}\n{}", summary, body);
-//     Notification::new()
-//         .summary(summary)
-//         .body(body)
-//         .show()?;
-//     println!("Notification sent.");
-//     Ok(())
-// }
-
-// fn cropping_all_images_test() {
-//     let mut files = std::fs::read_dir(SCREENSHOT_PATH).unwrap();
-//     while let Some(file) = files.next() {
-//         let filename = file.unwrap().path().display().to_string();
-//         if filename.contains("screenshot") {
-//             crop_image(filename.as_str());
-//         }
-//     }
-// }

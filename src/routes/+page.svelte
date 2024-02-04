@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import '../app.css';
 	import SettingsPicker from '$lib/SettingsPicker.svelte';
 	import { onMount, onDestroy } from 'svelte';
@@ -6,33 +6,35 @@
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
 
-	const TITLE = 'FlashMem Translated Sub';
+	const TITLE: string = 'FlashMem Translated Sub';
 
 	let languages = ['English', 'French', 'Spanish', 'German', 'Italian'];
 	let platforms = ['Default', 'Netflix', 'Youtube', 'Amazon Prime Video', 'AppleTV', 'Hulu'];
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T'];
+	let current_shortcut = 'Ctrl+T';
 
 	onMount(async () => {
-		await register_shortcut();
+		await register_shortcut('Ctrl+T');
 	});
 
 	onDestroy(async () => {
 		await unregisterAll();
 	});
 
-	async function register_shortcut() {
+	async function register_shortcut(shortcut: string) {
 		try {
 			await unregisterAll();
-			await register('Ctrl+G', execute);
-			console.log('Shortcut Ctrl+G registered');
+			await register(shortcut, execute);
+			current_shortcut = shortcut;
+			console.log('Shortcut ' + shortcut + ' registered');
 		} catch (error) {
-			console.error('Error registering shortcut:', error);
+			console.error('Error registering shortcut ' + shortcut + ' :', error);
 		}
 	}
 
 	async function execute() {
-		console.log('Ctrl+G pressed');
-		let notification = await invoke('execute');
+		console.log(current_shortcut + ' pressed');
+		let notification: string = await invoke('execute');
 		if (notification !== '###-Already Running-###') {
 			console.log('Sending notification...');
 			await send_notification(TITLE, notification);
@@ -41,9 +43,7 @@
 		}
 	}
 
-	/** @param {string} title
-	 *  @param {string} notification */
-	async function send_notification(title, notification) {
+	async function send_notification(title: string, notification: string) {
 		let permissionGranted = await isPermissionGranted();
 		if (!permissionGranted) {
 			const permission = await requestPermission();
@@ -52,6 +52,11 @@
 		if (permissionGranted) {
 			sendNotification({ title: title, body: notification });
 		}
+	}
+
+	function handleShortcutSelected(event: CustomEvent) {
+		register_shortcut(event.detail.shortcut);
+		console.log('Shortcut selected:', event.detail.shortcut);
 	}
 
 </script>
@@ -64,10 +69,10 @@
 	</div>
 	<div class="w-full space-y-3 max-w-md">
 		<SettingsPicker items={languages} label="Translate to..." placeholder="Pick a target language..."
-										defaultPick="English" />
+										defaultPick="English" command="set_target_language" />
 		<SettingsPicker items={platforms} label="Optimize for..." placeholder="Pick a platform..."
-										defaultPick="Default" />
+										defaultPick="Default" command="set_platform"/>
 		<SettingsPicker items={shortcuts} label="Shortcut to press..." placeholder="Pick a shortcut..."
-										defaultPick="Ctrl+T" />
+										defaultPick="Ctrl+T" command="set_shortcut" on:shortcutSelected={handleShortcutSelected} />
 	</div>
 </div>
