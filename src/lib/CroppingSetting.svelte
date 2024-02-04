@@ -22,29 +22,27 @@
 
 </script>
 
-<div class="text-white flex bg-gray-800 space-x-2 p-3 rounded-md">
-	<div>
-		<label for="fromPercent">Crop from:</label>
+<div class="flex items-center text-white bg-gray-800 space-x-3 p-3 rounded-md h-14">
+		<label for="fromPercent" class="text-white w-1/4">Crop from...</label>
+	<div class="w-1/2 flex items-center">
 		<input
 			id="fromPercent"
 			type="text"
 			bind:value={fromPercent}
 			on:blur={validateFrom}
-			class="p-2 rounded bg-gray-700 text-white w-1/2 md:w-1/3"
+			class="rounded bg-gray-700 text-center w-12"
 			placeholder="0"
 		/>
-		<label for="fromPercent">%</label>
-	</div>
-	<div>
-		<label for="toPercent">to:</label>
+		<label class= "me-3" for="fromPercent">%</label>
+		<label class= "mx-3" for="toPercent">to:</label>
 		<input
 			id="toPercent"
 			type="text"
 			bind:value={toPercent}
 			on:blur={validateTo}
-			class="p-2 rounded bg-gray-700 text-white w-1/2 md:w-1/3"
+			class="ms-3 rounded bg-gray-700 text-center w-12"
 			placeholder="100"
 		/>
-		<label for="toPercent">%</label>
+		<label class= "me-3" for="toPercent">%</label>
 	</div>
 </div>
