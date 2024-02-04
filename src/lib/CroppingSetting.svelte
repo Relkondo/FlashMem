@@ -34,7 +34,7 @@
 			placeholder="0"
 		/>
 		<label class= "me-3" for="fromPercent">%</label>
-		<label class= "mx-3" for="toPercent">to:</label>
+		<label class= "mx-3" for="toPercent">to</label>
 		<input
 			id="toPercent"
 			type="text"
