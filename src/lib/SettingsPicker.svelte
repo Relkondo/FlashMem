@@ -44,7 +44,7 @@
 	}
 </script>
 <div bind:this={dropdownElement} class="flex items-center bg-gray-800 space-x-3 p-3 rounded-md h-14" on:blur={closeDropdown} tabindex="-1">
-		<label for="search" class="text-white w-1/4">{label}</label>
+		<label for="search" class="text-white w-1/3">{label}</label>
 		<div class="relative w-1/2">
 			<input
 				type="text"
