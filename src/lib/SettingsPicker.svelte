@@ -28,7 +28,7 @@
 	function closeDropdown() {
 		showList = false;
 		if (!filteredItems.includes(search)) {
-			search = 'English';
+			search = defaultPick;
 		}
 	}
 
