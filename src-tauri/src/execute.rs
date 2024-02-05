@@ -1,19 +1,14 @@
 use std::any::Any;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::ops::Deref;
-use std::path::Path;
 use std::process::Command;
 use std::sync::MutexGuard;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration};
 use chrono::Local;
 use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
 use htmlentity::entity::{decode, ICodedDataTrait};
-use image::{ColorType, EncodableLayout, GenericImageView, ImageEncoder, RgbaImage};
-use image::codecs::png::PngEncoder;
+use image::{EncodableLayout, ImageEncoder, RgbaImage};
 use image::imageops::crop_imm;
 use regex::Regex;
 use crate::SettingsState;
@@ -29,7 +24,6 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
     let screenshot = capture_screenshot().expect("Couldn't capture screenshot.");
     let filename = crop_screenshot(screenshot.clone(), settings.platform.as_str());
-    let filename2 = crop_screenshot_manual(screenshot.clone(), settings.platform.as_str());
     let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text, settings.platform.as_str());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
@@ -68,9 +62,6 @@ fn capture_screenshot() -> Option<RgbaImage> {
 }
 
 fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> String {
-    let start = Instant::now();
-    let start1 = Instant::now();
-    println!("Cropping image...");
     let (width, height) = screenshot.dimensions();
     let (x_ratio, y_ratio, width_ratio, height_ratio) = get_platform_cropping(platform);
     let top = (height as f64 * y_ratio) as u32;
@@ -81,74 +72,19 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> String {
         println!("Cropping dimensions are out of bounds.");
     }
     let cropped_image = crop_imm(&screenshot, left, top, cropped_width, cropped_height).to_image();
-    println!("Time elapsed cropping 1: {:?}", start1.elapsed());
-    let start2 = Instant::now();
     let filename = format!("{}cropped_{}.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
     cropped_image.save(filename.to_owned()).unwrap();
-    println!("Time elapsed saving 1: {:?}", start2.elapsed());
     println!("Cropped screenshot saved as {}", filename);
-    println!("Time elapsed 1: {:?}", start.elapsed());
     filename
 }
-
-fn save_image_and_flush(data: &[u8], w: u32, h: u32, filename: &str) {
-    let file = File::create(Path::new(filename)).unwrap();
-    let mut writer = BufWriter::new(file);
-    {
-        let encoder = PngEncoder::new(&mut writer);
-        encoder.write_image(data, w, h, ColorType::Rgba8).unwrap();
-    }
-    writer.flush().unwrap();
-    let file = writer.into_inner().unwrap();
-    file.sync_all().unwrap();
-}
-
-fn crop_screenshot_manual(screenshot: RgbaImage, platform: &str) -> String {
-    let start = Instant::now();
-    let start1 = Instant::now();
-    println!("Cropping image...");
-    let (width, height) = screenshot.dimensions();
-    let (x_ratio, y_ratio, width_ratio, height_ratio) = get_platform_cropping(platform);
-    let top = (height as f64 * y_ratio) as u32;
-    let cropped_height = (height as f64 * height_ratio) as u32;
-    let left = (width as f64 * x_ratio) as u32;
-    let cropped_width = (width as f64 * width_ratio) as u32;
-    if left + cropped_width > width || top + cropped_height > height {
-        println!("Cropping dimensions are out of bounds.");
-    }
-    let mut cropped_data = Vec::with_capacity(cropped_height as usize * cropped_width as usize * 4);
-    let mut x = 0;
-    let mut y = 0;
-    for chunk in screenshot.chunks_exact(4) {
-        if x >= left && x < left + cropped_width && y >= top && y < top + cropped_height {
-            cropped_data.extend_from_slice(chunk);
-        }
-        x = (x + 1) % width;
-        if x == 0 {
-            y += 1;
-        }
-    }
-    println!("Time elapsed cropping 2: {:?}", start1.elapsed());
-    let start2 = Instant::now();
-    let filename = format!("{}cropped_{}_2.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
-    save_image_and_flush(cropped_data.as_bytes(), cropped_width, cropped_height, &filename);
-    println!("Time elapsed saving 2: {:?}", start2.elapsed());
-    println!("Cropped screenshot saved as {}", filename);
-    println!("Time elapsed 2: {:?}", start.elapsed());
-    filename
-}
-
 fn execute_ocr(filename: String) -> Option<String> {
-    println!("Starting Tesseract OCR...");
     let ocr_result = "assets/ocr_result";
     let ocr_result_txt = ocr_result.to_owned() + ".txt";
-    println!("Filename: {}, OCR result: {}", filename, ocr_result);
     thread::sleep(Duration::from_millis(150));
     let output_result = Command::new("tesseract")
         .arg(filename.to_owned())
         .arg(ocr_result.to_owned())
         .output();
-    println!("Tesseract over.");
     match output_result {
         Ok(output) => {
             if !output.status.success() {
@@ -203,7 +139,6 @@ fn is_valid_time_format(time: &str) -> bool {
 }
 
 fn format_text(text: String, platform: &str) -> String {
-    println!("Checking for noise...");
     let lines = text.split("\n").map(|line| line.trim()).collect::<Vec<&str>>();
     let mut result = String::new();
     let mut i = 0;
