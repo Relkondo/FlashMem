@@ -23,7 +23,7 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     let filename = capture_screenshot().expect("Couldn't capture screenshot.");
     let cropped_file = crop_image(filename.as_str(), settings.platform.as_str());
     let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
-    let formatted_text = format_text(origin_text);
+    let formatted_text = format_text(origin_text, settings.platform.as_str());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
     let clean_translation = truncate_translation(&formatted_text, &translated_text);
@@ -119,10 +119,25 @@ fn valid_end_sentence(text: &str) -> bool {
 }
 
 fn line_is_invalid(text: &str) -> bool {
-    text.contains("©") || text.contains("®") || text.contains("™")
-        || text.chars().all(|c| c.is_numeric()) ||
-        !text.chars().any(|c| c.is_alphabetic()) ||
-        (text.len() < 5 && !valid_end_sentence(text))
+    let len = text.len();
+    let mut numeric_nb = 0;
+    let mut alpha_nb = 0;
+    for c in text.chars() {
+        if c == '©' || c == '©' || c == '™' {
+            return false;
+        } else if  c.is_alphabetic() {
+            alpha_nb += 1;
+        } else if c.is_numeric() {
+            numeric_nb += 1;
+        }
+    }
+    len == 0 || len == numeric_nb || alpha_nb == 0 || numeric_nb + alpha_nb <= text.len() / 2 ||
+        (len < 5 && !valid_end_sentence(text))
+}
+
+fn is_title_line(text: &str, platform: &str) -> bool {
+    platform == "Amazon Prime Video" &&
+        Regex::new(r"\w+ \d+, Ep. \d+ \wpisode \d+").unwrap().is_match(text)
 }
 
 fn is_valid_time_format(time: &str) -> bool {
@@ -130,20 +145,19 @@ fn is_valid_time_format(time: &str) -> bool {
     re.is_match(time) && time.trim().split(':').all(|part| part.parse::<u32>().is_ok())
 }
 
-fn format_text(text: String) -> String {
+fn format_text(text: String, platform: &str) -> String {
     println!("Checking for noise...");
     let lines = text.split("\n").map(|line| line.trim()).collect::<Vec<&str>>();
     let mut result = String::new();
     let mut i = 0;
-    while i < lines.len() && (line_is_invalid(lines[i]) || lines[i].is_empty()) {
-        i += 1;
-    }
     while i < lines.len() && !is_valid_time_format(lines[i]) {
         if !line_is_invalid(lines[i]) {
-            result.push_str(&*lines[i].replace('|', "I"));
-            result.push('\n');
-        } else if i + 1 < lines.len() && lines[i + 1].is_empty() {
-            i += 1;
+            if is_title_line(lines[i], platform) {
+                result = String::new();
+            } else {
+                result.push_str(&*lines[i].replace('|', "I"));
+                result.push('\n');
+            }
         }
         i += 1;
     }
