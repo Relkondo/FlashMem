@@ -1,28 +1,36 @@
+use std::any::Any;
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::ops::Deref;
+use std::path::Path;
 use std::process::Command;
 use std::sync::MutexGuard;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use chrono::Local;
 use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
 use htmlentity::entity::{decode, ICodedDataTrait};
-use image::GenericImageView;
+use image::{ColorType, EncodableLayout, GenericImageView, ImageEncoder, RgbaImage};
+use image::codecs::png::PngEncoder;
+use image::imageops::crop_imm;
 use regex::Regex;
 use crate::SettingsState;
 use crate::utils::{get_language_code, get_platform_cropping};
+use xcap::Monitor;
 
 mod translation_response;
 
 static FOOTER_START: &'static str = "[Detected Source Language:";
-static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
 
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
-    let filename = capture_screenshot().expect("Couldn't capture screenshot.");
-    let cropped_file = crop_image(filename.as_str(), settings.platform.as_str());
-    let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
+    let screenshot = capture_screenshot().expect("Couldn't capture screenshot.");
+    let filename = crop_screenshot(screenshot.clone(), settings.platform.as_str());
+    let filename2 = crop_screenshot_manual(screenshot.clone(), settings.platform.as_str());
+    let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text, settings.platform.as_str());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
@@ -32,53 +40,102 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     notification
 }
 
-fn capture_screenshot() -> Option<String> {
-    let display = scrap::Display::primary().expect("Couldn't find primary display.");
-    let mut capturer = scrap::Capturer::new(display).expect("Couldn't begin capture.");
-    let (w, h) = (capturer.width(), capturer.height());
-
-    loop {
-        match capturer.frame() {
-            Ok(frame) => {
-                let mut image_data = Vec::with_capacity(frame.len());
-                for chunk in frame.chunks_exact(4) {
-                    // Convert BGRA to RGBA
-                    image_data.extend_from_slice(&[chunk[2], chunk[1], chunk[0], chunk[3]]);
-                }
-                let filename = format!("{}screenshot_{}.png", SCREENSHOT_PATH, Local::now().format("%Y%m%d_%H%M%S"));
-                let mut file = std::fs::File::create(&filename).expect("Couldn't create file.");
-                let mut encoder = png::Encoder::new(&mut file, w as u32, h as u32);
-                encoder.set_color(png::ColorType::Rgba); // Set the color type to RGBA
-                encoder.set_depth(png::BitDepth::Eight); // Set the bit depth
-                encoder.write_header().unwrap().write_image_data(&image_data).expect("Couldn't write image data.");
-                println!("Screenshot saved as {}", filename);
-                return Some(filename);
-            }
-            Err(error) => {
-                if error.kind() == std::io::ErrorKind::WouldBlock {
-                    thread::sleep(Duration::from_millis(100));
-                } else {
-                    println!("Error: {}", error);
-                    return None;
+fn capture_screenshot() -> Option<RgbaImage> {
+    let monitors = Monitor::all().unwrap();
+    for monitor in monitors {
+        if monitor.is_primary() {
+            loop {
+                match monitor.capture_image() {
+                    Ok(screenshot) => {
+                        println!("Screenshot successful!");
+                        return Some(screenshot);
+                    }
+                    Err(error) => {
+                        if error.type_id() == std::io::ErrorKind::WouldBlock.type_id() {
+                            println!("Blocked while capturing frame. Trying again...");
+                            thread::sleep(Duration::from_millis(100));
+                        } else {
+                            println!("Error: {}", error);
+                            return None;
+                        }
+                    }
                 }
             }
         }
     }
+    println!("Error: No primary screen found");
+    return None;
 }
 
-fn crop_image(image_path: &str, platform: &str) -> String {
-    let mut img = image::open(image_path).expect("Failed to open image");
-    let (width, height) = img.dimensions();
+fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> String {
+    let start = Instant::now();
+    let start1 = Instant::now();
+    println!("Cropping image...");
+    let (width, height) = screenshot.dimensions();
     let (x_ratio, y_ratio, width_ratio, height_ratio) = get_platform_cropping(platform);
     let top = (height as f64 * y_ratio) as u32;
     let cropped_height = (height as f64 * height_ratio) as u32;
     let left = (width as f64 * x_ratio) as u32;
     let cropped_width = (width as f64 * width_ratio) as u32;
-    let cropped_image = img.crop(left, top, cropped_width, cropped_height);
-    let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
-    cropped_image.save(cropped_filename.to_owned()).unwrap();
-    std::fs::remove_file(image_path).expect("Couldn't delete file.");
-    cropped_filename
+    if left + cropped_width > width || top + cropped_height > height {
+        println!("Cropping dimensions are out of bounds.");
+    }
+    let cropped_image = crop_imm(&screenshot, left, top, cropped_width, cropped_height).to_image();
+    println!("Time elapsed cropping 1: {:?}", start1.elapsed());
+    let start2 = Instant::now();
+    let filename = format!("{}cropped_{}.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
+    cropped_image.save(filename.to_owned()).unwrap();
+    println!("Time elapsed saving 1: {:?}", start2.elapsed());
+    println!("Cropped screenshot saved as {}", filename);
+    println!("Time elapsed 1: {:?}", start.elapsed());
+    filename
+}
+
+fn save_image_and_flush(data: &[u8], w: u32, h: u32, filename: &str) {
+    let file = File::create(Path::new(filename)).unwrap();
+    let mut writer = BufWriter::new(file);
+    {
+        let encoder = PngEncoder::new(&mut writer);
+        encoder.write_image(data, w, h, ColorType::Rgba8).unwrap();
+    }
+    writer.flush().unwrap();
+    let file = writer.into_inner().unwrap();
+    file.sync_all().unwrap();
+}
+
+fn crop_screenshot_manual(screenshot: RgbaImage, platform: &str) -> String {
+    let start = Instant::now();
+    let start1 = Instant::now();
+    println!("Cropping image...");
+    let (width, height) = screenshot.dimensions();
+    let (x_ratio, y_ratio, width_ratio, height_ratio) = get_platform_cropping(platform);
+    let top = (height as f64 * y_ratio) as u32;
+    let cropped_height = (height as f64 * height_ratio) as u32;
+    let left = (width as f64 * x_ratio) as u32;
+    let cropped_width = (width as f64 * width_ratio) as u32;
+    if left + cropped_width > width || top + cropped_height > height {
+        println!("Cropping dimensions are out of bounds.");
+    }
+    let mut cropped_data = Vec::with_capacity(cropped_height as usize * cropped_width as usize * 4);
+    let mut x = 0;
+    let mut y = 0;
+    for chunk in screenshot.chunks_exact(4) {
+        if x >= left && x < left + cropped_width && y >= top && y < top + cropped_height {
+            cropped_data.extend_from_slice(chunk);
+        }
+        x = (x + 1) % width;
+        if x == 0 {
+            y += 1;
+        }
+    }
+    println!("Time elapsed cropping 2: {:?}", start1.elapsed());
+    let start2 = Instant::now();
+    let filename = format!("{}cropped_{}_2.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
+    save_image_and_flush(cropped_data.as_bytes(), cropped_width, cropped_height, &filename);
+    println!("Time elapsed saving 2: {:?}", start2.elapsed());
+    println!("Cropped screenshot saved as {}", filename);
+    println!("Time elapsed 2: {:?}", start.elapsed());
+    filename
 }
 
 fn execute_ocr(filename: String) -> Option<String> {

@@ -17,7 +17,7 @@ tauri-build = { version = "1.5.1", features = [] }
 [dependencies]
 tauri = { version = "1.5.4", features = [ "global-shortcut-all", "notification-all"] }
 device_query = "1.1.3"
-scrap = "0.5.0"
+xcap = "0.0.3"
 rdev = { git = "https://github.com/fufesou/rdev" }
 png = "0.17.11"
 chrono = "0.4.32"
