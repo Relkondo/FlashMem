@@ -10,7 +10,7 @@ use htmlentity::entity::{decode, ICodedDataTrait};
 use image::GenericImageView;
 use regex::Regex;
 use crate::SettingsState;
-use crate::utils::get_language_code;
+use crate::utils::{get_language_code, get_platform_cropping};
 
 mod translation_response;
 static FOOTER_START: &'static str = "[Detected Source Language:";
@@ -20,7 +20,8 @@ static CROPPED_PATH: &'static str = "assets/cropped/";
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
     let filename = capture_screenshot().expect("Couldn't capture screenshot.");
-    let cropped_file = crop_image(filename.as_str());
+    let (crop_top, crop_height) =  get_platform_cropping(settings.platform.as_str());
+    let cropped_file = crop_image(filename.as_str(), crop_top, crop_height);
     let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text);
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
@@ -65,12 +66,12 @@ fn capture_screenshot() -> Option<String> {
     }
 }
 
-fn crop_image(image_path: &str) -> String {
+fn crop_image(image_path: &str, crop_top: f64, crop_height: f64) -> String {
     let mut img = image::open(image_path).expect("Failed to open image");
     let (width, height) = img.dimensions();
-    let top = (height as f64 * 0.6) as u32;
-    let crop_height = (height as f64 * 0.35) as u32;
-    let cropped_image = img.crop(0, top, width, crop_height);
+    let top = (height as f64 * crop_top) as u32;
+    let cropped_height = (height as f64 * crop_height) as u32;
+    let cropped_image = img.crop(0, top, width, cropped_height);
     let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
     cropped_image.save(cropped_filename.to_owned()).unwrap();
     std::fs::remove_file(image_path).expect("Couldn't delete file.");
