@@ -9,7 +9,7 @@
 	const TITLE: string = 'FlashMem Translated Sub';
 
 	let languages = ['English', 'French', 'Spanish', 'German', 'Italian'];
-	let platforms = ['Default', 'Netflix', 'Youtube', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', 'Disney+']
+	let platforms = ['Default', 'Netflix', 'YouTube', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', 'Disney+']
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T'];
 	let current_shortcut = 'Ctrl+T';
 
