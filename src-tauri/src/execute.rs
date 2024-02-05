@@ -13,6 +13,7 @@ use crate::SettingsState;
 use crate::utils::{get_language_code, get_platform_cropping};
 
 mod translation_response;
+
 static FOOTER_START: &'static str = "[Detected Source Language:";
 static SCREENSHOT_PATH: &'static str = "assets/screenshots/";
 static CROPPED_PATH: &'static str = "assets/cropped/";
@@ -20,14 +21,13 @@ static CROPPED_PATH: &'static str = "assets/cropped/";
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
     let filename = capture_screenshot().expect("Couldn't capture screenshot.");
-    let (crop_top, crop_height) =  get_platform_cropping(settings.platform.as_str());
-    let cropped_file = crop_image(filename.as_str(), crop_top, crop_height);
+    let cropped_file = crop_image(filename.as_str(), settings.platform.as_str());
     let origin_text = execute_ocr(cropped_file).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text);
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
     let clean_translation = truncate_translation(&formatted_text, &translated_text);
-    let notification =  format_notification(&clean_translation, detected_source_language);
+    let notification = format_notification(&clean_translation, detected_source_language);
     println!("Sending the following notification:\n{}", notification);
     notification
 }
@@ -45,7 +45,7 @@ fn capture_screenshot() -> Option<String> {
                     // Convert BGRA to RGBA
                     image_data.extend_from_slice(&[chunk[2], chunk[1], chunk[0], chunk[3]]);
                 }
-                let filename = format!( "{}screenshot_{}.png", SCREENSHOT_PATH, Local::now().format("%Y%m%d_%H%M%S"));
+                let filename = format!("{}screenshot_{}.png", SCREENSHOT_PATH, Local::now().format("%Y%m%d_%H%M%S"));
                 let mut file = std::fs::File::create(&filename).expect("Couldn't create file.");
                 let mut encoder = png::Encoder::new(&mut file, w as u32, h as u32);
                 encoder.set_color(png::ColorType::Rgba); // Set the color type to RGBA
@@ -66,12 +66,15 @@ fn capture_screenshot() -> Option<String> {
     }
 }
 
-fn crop_image(image_path: &str, crop_top: f64, crop_height: f64) -> String {
+fn crop_image(image_path: &str, platform: &str) -> String {
     let mut img = image::open(image_path).expect("Failed to open image");
     let (width, height) = img.dimensions();
-    let top = (height as f64 * crop_top) as u32;
-    let cropped_height = (height as f64 * crop_height) as u32;
-    let cropped_image = img.crop(0, top, width, cropped_height);
+    let (x_ratio, y_ratio, width_ratio, height_ratio) = get_platform_cropping(platform);
+    let top = (height as f64 * y_ratio) as u32;
+    let cropped_height = (height as f64 * height_ratio) as u32;
+    let left = (width as f64 * x_ratio) as u32;
+    let cropped_width = (width as f64 * width_ratio) as u32;
+    let cropped_image = img.crop(left, top, cropped_width, cropped_height);
     let cropped_filename = format!("{}cropped_{}", CROPPED_PATH, image_path.split("screenshot_").last().unwrap());
     cropped_image.save(cropped_filename.to_owned()).unwrap();
     std::fs::remove_file(image_path).expect("Couldn't delete file.");
@@ -116,8 +119,8 @@ fn valid_end_sentence(text: &str) -> bool {
 }
 
 fn line_is_invalid(text: &str) -> bool {
-    text.contains("©") || text.contains("®") || text.contains("™") ||
-        text.contains("&") || text.chars().all(|c| c.is_numeric()) ||
+    text.contains("©") || text.contains("®") || text.contains("™")
+        || text.chars().all(|c| c.is_numeric()) ||
         !text.chars().any(|c| c.is_alphabetic()) ||
         (text.len() < 5 && !valid_end_sentence(text))
 }

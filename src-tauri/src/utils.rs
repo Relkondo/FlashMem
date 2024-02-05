@@ -58,15 +58,15 @@ pub fn get_language_code(lang: &str) -> &'static str {
     }
 }
 
-pub fn get_platform_cropping(platform: &str) -> (f64, f64) {
+pub fn get_platform_cropping(platform: &str) -> (f64, f64, f64, f64) {
     match platform {
-        "Netflix" => (0.6, 0.28),
-        "Hulu" => (0.6, 0.37),
-        "Amazon Prime Video" => (0.6, 0.35),
-        "Disney+" => (0.6, 0.35),
-        "Max" => (0.6, 0.34),
-        "YouTube" => (0.6, 0.38),
-        "AppleTV" => (0.6, 0.33),
-        _ => (0.6, 0.35)
+        "Netflix" => (0.0, 0.6, 1.0, 0.28),
+        "Hulu" => (0.0, 0.6, 1.0, 0.37),
+        "Amazon Prime Video" => (0.25, 0.0, 0.50, 0.96),
+        "Disney+" => (0.0, 0.6, 1.0, 0.35),
+        "Max" => (0.0, 0.6, 1.0, 0.34),
+        "YouTube" => (0.0, 0.6, 1.0, 0.38),
+        "AppleTV" => (0.23, 0.0, 0.54, 0.93),
+        _ => (0.0, 0.6, 1.0, 0.35)
     }
 }
