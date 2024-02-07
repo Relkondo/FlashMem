@@ -85,17 +85,16 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> RgbaImage {
     cropped_image
 }
 
-fn encode_as_png(image: &RgbaImage) -> Vec<u8> {
+fn encode_as_png(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
     let mut bytes: Vec<u8> = Vec::new();
-    image.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)
-        .expect("Couldn't write image to bytes.");
-    bytes
+    image.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)?;
+    Ok(bytes)
 }
 
 async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn std::error::Error>> {
     let url = format!("https://vision.googleapis.com/v1/images:annotate?key={}", API_KEY);
     println!("Calling Google Vision...");
-    let b64 = general_purpose::STANDARD.encode(encode_as_png(file));
+    let b64 = general_purpose::STANDARD.encode(encode_as_png(file)?);
     let response = reqwest::Client::new()
         .post(&url)
         .json(&json!({
@@ -133,19 +132,14 @@ async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn s
     }
 }
 
-fn get_tesseract_result(tesseract: Tesseract, file: &RgbaImage) -> Result<String, TesseractOriginatedError> {
-    Ok(tesseract.set_image_from_mem(&encode_as_png(file)).map_err(|e|  TesseractOriginatedError::PixReadMemError(e))?
-        .recognize().map_err(|e| TesseractOriginatedError::TessBaseApiRecogniseError(e))?
-        .get_text().map_err(|e|  TesseractOriginatedError::TessBaseApiGetUtf8TextError(e))?)
+fn get_tesseract_result(file: &RgbaImage) -> Result<String, TesseractOriginatedError> {
+    let tesseract = Tesseract::new(None, Some("eng")).unwrap();
+    Ok(tesseract.set_image_from_mem(&encode_as_png(file)?)?.recognize()?.get_text()?)
 }
 
 fn execute_tesseract_ocr(file: &RgbaImage) -> Option<String> {
     println!("Using Tesseract...");
-    let tesseract = Tesseract::new(None, Some("eng")).unwrap();
-    // tesseract.set_page_seg_mode(tesseract::PageSegMode::PsmAuto);
-    // tesseract.set_whitelist("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()_+-=[]{}|;:,.<>?")
-
-    match get_tesseract_result(tesseract, file){
+    match get_tesseract_result(file){
         Ok(text) => {
             println!("Tesseract executed successfully. Result:");
             println!("{}", text);

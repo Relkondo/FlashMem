@@ -1146,6 +1146,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tesseract",
+ "thiserror",
  "tokio",
  "xcap",
 ]
