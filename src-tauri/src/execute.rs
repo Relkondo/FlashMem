@@ -1,8 +1,8 @@
 use std::any::Any;
 use std::sync::MutexGuard;
 use std::thread;
-use std::time::{Duration};
-use std::io::Cursor;
+use std::time::{Duration, Instant};
+use std::io::{Cursor};
 use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
@@ -23,19 +23,34 @@ mod vision_response;
 mod tesseract_originated_error;
 
 static FOOTER_START: &'static str = "[Detected Source Language:";
-// static CROPPED_PATH: &'static str = "assets/cropped/";
 static API_KEY: &'static str = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A";
 
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
+    let total = Instant::now();
+    let step1 = Instant::now();
     let screenshot = capture_screenshot().expect("Couldn't capture screenshot.");
+    println!("Screenshot captured in {}ms.", step1.elapsed().as_millis());
+    let step2 = Instant::now();
     let image_data = crop_screenshot(screenshot.clone(), settings.platform.as_str());
+    println!("Screenshot cropped in {}ms.", step2.elapsed().as_millis());
+    let step3 = Instant::now();
     let origin_text = execute_ocr(image_data, settings.platform.as_str()).expect("Couldn't execute OCR.");
+    println!("Text extracted in {}ms.", step3.elapsed().as_millis());
+    let step4 = Instant::now();
     let formatted_text = format_text(origin_text, settings.platform.as_str());
+    println!("Text formatted in {}ms.", step4.elapsed().as_millis());
+    let step5 = Instant::now();
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
+    println!("Text translated in {}ms.", step5.elapsed().as_millis());
+    let step6 = Instant::now();
     let clean_translation = truncate_translation(&formatted_text, &translated_text);
+    println!("Translation cleaned in {}ms.", step6.elapsed().as_millis());
+    let step7 = Instant::now();
     let notification = format_notification(&clean_translation, detected_source_language);
+    println!("Notification formatted in {}ms.", step7.elapsed().as_millis());
+    println!("TOTAL ELAPSED: {}ms.", total.elapsed().as_millis());
     println!("Sending the following notification:\n{}", notification);
     notification
 }
@@ -79,16 +94,13 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> RgbaImage {
         println!("Cropping dimensions are out of bounds.");
     }
     let cropped_image = crop_imm(&screenshot, left, top, cropped_width, cropped_height).to_image();
-    // let filename = format!("{}cropped_{}.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
-    // cropped_image.save(&filename).unwrap();
-    // println!("Cropped screenshot saved as {}", &filename);
     cropped_image
 }
 
 fn encode_as_png(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
-    let mut bytes: Vec<u8> = Vec::new();
-    image.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)?;
-    Ok(bytes)
+    let mut bytes_tiff: Vec<u8> = Vec::new();
+    image.write_to(&mut Cursor::new(&mut bytes_tiff), image::ImageOutputFormat::Tiff)?;
+    Ok(bytes_tiff)
 }
 
 async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn std::error::Error>> {
@@ -133,13 +145,14 @@ async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn s
 }
 
 fn get_tesseract_result(file: &RgbaImage) -> Result<String, TesseractOriginatedError> {
-    let tesseract = Tesseract::new(None, Some("eng")).unwrap();
-    Ok(tesseract.set_image_from_mem(&encode_as_png(file)?)?.recognize()?.get_text()?)
+    let tesseract: Tesseract = Tesseract::new(None, Some("eng")).unwrap();
+    Ok(tesseract.set_image_from_mem(&encode_as_png(file)?)?.set_source_resolution(264).get_text()?)
 }
 
 fn execute_tesseract_ocr(file: &RgbaImage) -> Option<String> {
     println!("Using Tesseract...");
-    match get_tesseract_result(file){
+    let result = get_tesseract_result(file);
+    match result {
         Ok(text) => {
             println!("Tesseract executed successfully. Result:");
             println!("{}", text);
