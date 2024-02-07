@@ -1,9 +1,8 @@
 use std::any::Any;
-use std::process::Command;
 use std::sync::MutexGuard;
 use std::thread;
 use std::time::{Duration};
-use chrono::Local;
+use std::io::Cursor;
 use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
@@ -15,19 +14,23 @@ use crate::SettingsState;
 use crate::utils::{get_language_code, get_platform_cropping};
 use xcap::Monitor;
 use crate::execute::vision_response::VisionResponse;
+use base64::{engine::general_purpose, Engine as _};
+use tesseract::{Tesseract};
+use crate::execute::tesseract_originated_error::TesseractOriginatedError;
 
 mod translation_response;
 mod vision_response;
+mod tesseract_originated_error;
 
 static FOOTER_START: &'static str = "[Detected Source Language:";
-static CROPPED_PATH: &'static str = "assets/cropped/";
+// static CROPPED_PATH: &'static str = "assets/cropped/";
 static API_KEY: &'static str = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A";
 
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
     let screenshot = capture_screenshot().expect("Couldn't capture screenshot.");
-    let filename = crop_screenshot(screenshot.clone(), settings.platform.as_str());
-    let origin_text = execute_ocr(filename, settings.platform.as_str()).expect("Couldn't execute OCR.");
+    let image_data = crop_screenshot(screenshot.clone(), settings.platform.as_str());
+    let origin_text = execute_ocr(image_data, settings.platform.as_str()).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text, settings.platform.as_str());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
@@ -64,7 +67,8 @@ fn capture_screenshot() -> Option<RgbaImage> {
     return None;
 }
 
-fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> String {
+fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> RgbaImage {
+    println!("Cropping...");
     let (width, height) = screenshot.dimensions();
     let (x_ratio, y_ratio, width_ratio, height_ratio) = get_platform_cropping(platform);
     let top = (height as f64 * y_ratio) as u32;
@@ -75,22 +79,30 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> String {
         println!("Cropping dimensions are out of bounds.");
     }
     let cropped_image = crop_imm(&screenshot, left, top, cropped_width, cropped_height).to_image();
-    let filename = format!("{}cropped_{}.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
-    cropped_image.save(filename.to_owned()).unwrap();
-    println!("Cropped screenshot saved as {}", filename);
-    filename
+    // let filename = format!("{}cropped_{}.png", CROPPED_PATH, Local::now().format("%Y%m%d_%H%M%S"));
+    // cropped_image.save(&filename).unwrap();
+    // println!("Cropped screenshot saved as {}", &filename);
+    cropped_image
 }
 
-async fn execute_google_vision_ocr(file: String) -> Option<String> {
+fn encode_as_png(image: &RgbaImage) -> Vec<u8> {
+    let mut bytes: Vec<u8> = Vec::new();
+    image.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)
+        .expect("Couldn't write image to bytes.");
+    bytes
+}
+
+async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn std::error::Error>> {
     let url = format!("https://vision.googleapis.com/v1/images:annotate?key={}", API_KEY);
     println!("Calling Google Vision...");
+    let b64 = general_purpose::STANDARD.encode(encode_as_png(file));
     let response = reqwest::Client::new()
         .post(&url)
         .json(&json!({
             "requests": [
                 {
                   "image": {
-                    "content": file
+                    "content": b64
                   },
                   "features": [
                     {
@@ -101,60 +113,63 @@ async fn execute_google_vision_ocr(file: String) -> Option<String> {
             ]
         }))
         .send()
-        .await
-        .expect("Failed to send request.");
+        .await?;
     let response_body = response.text().await?;
+    println!("Received response:\n{} !", response_body);
+    println!("Extracting json...");
     let json_response: VisionResponse = serde_json::from_str(&response_body)?;
     if let Some(text) = json_response.responses.get(0) {
-        if let Some(text_annotations) = text.fullTextAnnotation() {
-            let content = text_annotations.text.to_owned();
-            println!("Received response:\n{}", content);
-            Some(content)
+        if let Some(text_annotations) = &text.fullTextAnnotation {
+            println!("Decoding...");
+            let bytes = text_annotations.text.to_owned().into_bytes();
+            let decoded_response = decode(&bytes).to_string().expect("Couldn't decode response.");
+            println!("Decoded translation: {}", decoded_response);
+            Ok(decoded_response)
         } else {
-            eprintln!("No text annotations found in response.");
-            None
+            Err("No text annotations found in response.".into())
         }
     } else {
-        eprintln!("No text found in response.");
-        None
+        Err("No text found in response.".into())
     }
 }
 
-fn execute_tesseract_ocr(filename: String) -> Option<String> {
-    let ocr_result = "assets/ocr_result";
-    let ocr_result_txt = ocr_result.to_owned() + ".txt";
-    thread::sleep(Duration::from_millis(150));
-    let output_result = Command::new("tesseract")
-        .arg(filename.to_owned())
-        .arg(ocr_result.to_owned())
-        .output();
-    match output_result {
-        Ok(output) => {
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                eprintln!("Standard Error: {}", stderr);
-                None
-            } else {
-                println!("Tesseract executed successfully. Result:");
-                let content = std::fs::read_to_string(ocr_result_txt.to_owned()).expect("Couldn't read file.");
-                println!("{}", content);
-                std::fs::remove_file(filename).expect("Couldn't delete file.");
-                std::fs::remove_file(ocr_result_txt).expect("Couldn't delete file.");
-                Some(content)
-            }
+fn get_tesseract_result(tesseract: Tesseract, file: &RgbaImage) -> Result<String, TesseractOriginatedError> {
+    Ok(tesseract.set_image_from_mem(&encode_as_png(file)).map_err(|e|  TesseractOriginatedError::PixReadMemError(e))?
+        .recognize().map_err(|e| TesseractOriginatedError::TessBaseApiRecogniseError(e))?
+        .get_text().map_err(|e|  TesseractOriginatedError::TessBaseApiGetUtf8TextError(e))?)
+}
+
+fn execute_tesseract_ocr(file: &RgbaImage) -> Option<String> {
+    println!("Using Tesseract...");
+    let tesseract = Tesseract::new(None, Some("eng")).unwrap();
+    // tesseract.set_page_seg_mode(tesseract::PageSegMode::PsmAuto);
+    // tesseract.set_whitelist("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()_+-=[]{}|;:,.<>?")
+
+    match get_tesseract_result(tesseract, file){
+        Ok(text) => {
+            println!("Tesseract executed successfully. Result:");
+            println!("{}", text);
+            Some(text)
         }
         Err(e) => {
-            eprintln!("Failed to execute command: {:?}", e);
+            eprintln!("Failed to execute Tesseract: {:?}", e);
             None
         }
     }
 }
 
-fn execute_ocr(filename: String, platform: &str) -> Option<String> {
+fn execute_ocr(image_data: RgbaImage, platform: &str) -> Option<String> {
     if platform == "YouTube" || platform == "VLC" {
-        execute_google_vision_ocr(filename)
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
+        match runtime.block_on(execute_google_vision_ocr(&image_data)) {
+            Ok(text) => Some(text),
+            Err(e) => {
+                eprintln!("Failed to execute Google Vision: {:?}", e);
+                execute_tesseract_ocr(&image_data)
+            }
+        }
     } else {
-        execute_tesseract_ocr(filename)
+        execute_tesseract_ocr(&image_data)
     }
 }
 
@@ -268,7 +283,7 @@ fn truncate_translation(untranslated: &str, translated: &str) -> String {
 }
 
 fn format_notification(translated_text: &str, detected_source_language: Option<String>) -> String {
-    let mut notification = translated_text.to_owned();
+    let mut notification = translated_text.to_string();
     if let Some(source_language) = detected_source_language {
         notification.push_str(&format!("\n{} {:?}]", FOOTER_START, source_language));
     }

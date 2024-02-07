@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
@@ -12,6 +14,6 @@ pub(crate) struct TranslationsData {
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct Translation {
-    #[allow(non_snake_case)]pub(crate) translatedText: String,
-    #[allow(non_snake_case)]pub(crate) detectedSourceLanguage: Option<String>,
+    pub(crate) translatedText: String,
+    pub(crate) detectedSourceLanguage: Option<String>,
 }
