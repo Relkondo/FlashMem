@@ -8,23 +8,26 @@ use reqwest;
 use serde_json::json;
 use translation_response::TranslationResponse;
 use htmlentity::entity::{decode, ICodedDataTrait};
-use image::{EncodableLayout, ImageEncoder, RgbaImage};
+use image::{RgbaImage};
 use image::imageops::crop_imm;
 use regex::Regex;
 use crate::SettingsState;
 use crate::utils::{get_language_code, get_platform_cropping};
 use xcap::Monitor;
+use crate::execute::vision_response::VisionResponse;
 
 mod translation_response;
+mod vision_response;
 
 static FOOTER_START: &'static str = "[Detected Source Language:";
 static CROPPED_PATH: &'static str = "assets/cropped/";
+static API_KEY: &'static str = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A";
 
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     println!("Executing FlashMem...");
     let screenshot = capture_screenshot().expect("Couldn't capture screenshot.");
     let filename = crop_screenshot(screenshot.clone(), settings.platform.as_str());
-    let origin_text = execute_ocr(filename).expect("Couldn't execute OCR.");
+    let origin_text = execute_ocr(filename, settings.platform.as_str()).expect("Couldn't execute OCR.");
     let formatted_text = format_text(origin_text, settings.platform.as_str());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
     let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
@@ -77,7 +80,47 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> String {
     println!("Cropped screenshot saved as {}", filename);
     filename
 }
-fn execute_ocr(filename: String) -> Option<String> {
+
+async fn execute_google_vision_ocr(file: String) -> Option<String> {
+    let url = format!("https://vision.googleapis.com/v1/images:annotate?key={}", API_KEY);
+    println!("Calling Google Vision...");
+    let response = reqwest::Client::new()
+        .post(&url)
+        .json(&json!({
+            "requests": [
+                {
+                  "image": {
+                    "content": file
+                  },
+                  "features": [
+                    {
+                      "type": "TEXT_DETECTION"
+                    }
+                  ]
+                }
+            ]
+        }))
+        .send()
+        .await
+        .expect("Failed to send request.");
+    let response_body = response.text().await?;
+    let json_response: VisionResponse = serde_json::from_str(&response_body)?;
+    if let Some(text) = json_response.responses.get(0) {
+        if let Some(text_annotations) = text.fullTextAnnotation() {
+            let content = text_annotations.text.to_owned();
+            println!("Received response:\n{}", content);
+            Some(content)
+        } else {
+            eprintln!("No text annotations found in response.");
+            None
+        }
+    } else {
+        eprintln!("No text found in response.");
+        None
+    }
+}
+
+fn execute_tesseract_ocr(filename: String) -> Option<String> {
     let ocr_result = "assets/ocr_result";
     let ocr_result_txt = ocr_result.to_owned() + ".txt";
     thread::sleep(Duration::from_millis(150));
@@ -107,6 +150,14 @@ fn execute_ocr(filename: String) -> Option<String> {
     }
 }
 
+fn execute_ocr(filename: String, platform: &str) -> Option<String> {
+    if platform == "YouTube" || platform == "VLC" {
+        execute_google_vision_ocr(filename)
+    } else {
+        execute_tesseract_ocr(filename)
+    }
+}
+
 fn valid_end_sentence(text: &str) -> bool {
     text.ends_with('.') || text.ends_with('!') || text.ends_with('?') || text.ends_with(':')
 }
@@ -118,7 +169,7 @@ fn line_is_invalid(text: &str) -> bool {
     for c in text.chars() {
         if c == '©' || c == '©' || c == '™' {
             return false;
-        } else if  c.is_alphabetic() {
+        } else if c.is_alphabetic() {
             alpha_nb += 1;
         } else if c.is_numeric() {
             numeric_nb += 1;
@@ -158,8 +209,7 @@ fn format_text(text: String, platform: &str) -> String {
 }
 
 async fn translate_text(text: String, target_language: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
-    let api_key = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A"; // Replace with your API key
-    let url = format!("https://translation.googleapis.com/language/translate/v2?key={}", api_key);
+    let url = format!("https://translation.googleapis.com/language/translate/v2?key={}", API_KEY);
 
     println!("Calling Google Translate...");
     let response = reqwest::Client::new()
