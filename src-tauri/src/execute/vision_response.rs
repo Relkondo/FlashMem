@@ -56,7 +56,7 @@ pub(crate) struct Symbol {
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct TextProperty {
-    pub(crate) detectedLanguages: Vec<DetectedLanguage>,
+    pub(crate) detectedLanguages: Option<Vec<DetectedLanguage>>,
     pub(crate) detectedBreak: Option<DetectedBreak>,
     pub(crate) detectedOrientation: Option<String>,
 
@@ -64,8 +64,8 @@ pub(crate) struct TextProperty {
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DetectedBreak {
+    #[serde(rename = "type")]
     pub(crate) type_: String,
-    pub(crate) isPrefix: bool,
 }
 
 #[derive(Deserialize, Serialize)]

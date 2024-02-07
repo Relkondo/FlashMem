@@ -38,7 +38,7 @@ fn main() {
 }
 
 #[tauri::command]
-fn execute(state: tauri::State<'_, SharedSettings>) -> String {
+fn execute(state: State<'_, SharedSettings>) -> String {
     if !IS_RUNNING.load(Ordering::SeqCst) {
         IS_RUNNING.store(true, Ordering::SeqCst);
         let settings: MutexGuard<SettingsState> = state.lock().unwrap();

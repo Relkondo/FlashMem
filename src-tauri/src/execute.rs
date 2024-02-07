@@ -97,16 +97,23 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> RgbaImage {
     cropped_image
 }
 
-fn encode_as_png(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
+fn encode_as_tiff(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
     let mut bytes_tiff: Vec<u8> = Vec::new();
     image.write_to(&mut Cursor::new(&mut bytes_tiff), image::ImageOutputFormat::Tiff)?;
     Ok(bytes_tiff)
 }
 
+fn encode_as_webp(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
+    let mut bytes: Vec<u8> = Vec::new();
+    image.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::WebP)?;
+    Ok(bytes)
+}
+
 async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn std::error::Error>> {
     let url = format!("https://vision.googleapis.com/v1/images:annotate?key={}", API_KEY);
+    let b64 = general_purpose::STANDARD.encode(encode_as_webp(file)?);
     println!("Calling Google Vision...");
-    let b64 = general_purpose::STANDARD.encode(encode_as_png(file)?);
+    let now = Instant::now();
     let response = reqwest::Client::new()
         .post(&url)
         .json(&json!({
@@ -126,9 +133,10 @@ async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn s
         .send()
         .await?;
     let response_body = response.text().await?;
-    println!("Received response:\n{} !", response_body);
+    println!("Google Vision response received in {}ms.", now.elapsed().as_millis());
     println!("Extracting json...");
     let json_response: VisionResponse = serde_json::from_str(&response_body)?;
+    println!("json extracted...");
     if let Some(text) = json_response.responses.get(0) {
         if let Some(text_annotations) = &text.fullTextAnnotation {
             println!("Decoding...");
@@ -146,7 +154,7 @@ async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn s
 
 fn get_tesseract_result(file: &RgbaImage) -> Result<String, TesseractOriginatedError> {
     let tesseract: Tesseract = Tesseract::new(None, Some("eng")).unwrap();
-    Ok(tesseract.set_image_from_mem(&encode_as_png(file)?)?.set_source_resolution(264).get_text()?)
+    Ok(tesseract.set_image_from_mem(&encode_as_tiff(file)?)?.set_source_resolution(264).get_text()?)
 }
 
 fn execute_tesseract_ocr(file: &RgbaImage) -> Option<String> {
