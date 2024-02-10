@@ -2110,7 +2110,8 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 [[package]]
 name = "leptonica-plumbing"
 version = "1.3.0"
-source = "git+https://github.com/relkondo/leptonica-plumbing#5fff40fda1fd842b14134b3fe9b4c9bbdd1b3834"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "649bf19e77d43f7b8d2acc2e9a6ccabc373773f395205890f1ecc950fad7606c"
 dependencies = [
  "leptonica-sys",
  "libc",
@@ -2120,7 +2121,8 @@ dependencies = [
 [[package]]
 name = "leptonica-sys"
 version = "0.4.7"
-source = "git+https://github.com/relkondo/leptonica-sys#5457303c64b5d418592ff6fb2553e4f8a97efa52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "335aadd5fa8d493d62d5596a980ce6ee823a72da45e89bcc45be3841e6d74bff"
 dependencies = [
  "bindgen",
  "pkg-config",
@@ -4106,7 +4108,8 @@ dependencies = [
 [[package]]
 name = "tesseract"
 version = "0.15.1"
-source = "git+https://github.com/Relkondo/tesseract-rs#adb9d5232b83f1443c2c6237238ef48441541e18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "220d5c325aa2fa6656edd8924ad9a91d7ac7b5e998fe0f083a84f7f06ec9fda7"
 dependencies = [
  "tesseract-plumbing",
  "tesseract-sys",
@@ -4116,7 +4119,8 @@ dependencies = [
 [[package]]
 name = "tesseract-plumbing"
 version = "0.11.0"
-source = "git+https://github.com/relkondo/tesseract-plumbing#29983fd3aed66cc077c6d10e9212e105d37c8659"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7fb02c52201d03517af73dd0a146ac62cbd6f0155ad3dc6455d0140d6112191"
 dependencies = [
  "leptonica-plumbing",
  "tesseract-sys",
@@ -4125,8 +4129,9 @@ dependencies = [
 
 [[package]]
 name = "tesseract-sys"
-version = "0.6.1"
-source = "git+https://github.com/relkondo/tesseract-sys#2466b26ed1b11d9dc71116135248e1659934733d"
+version = "0.5.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd33f6f216124cfaf0fa86c2c0cdf04da39b6257bd78c5e44fa4fa98c3a5857b"
 dependencies = [
  "bindgen",
  "leptonica-sys",
