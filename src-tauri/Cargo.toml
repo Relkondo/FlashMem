@@ -16,20 +16,16 @@ tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
 tauri = { version = "1.5.4", features = [ "global-shortcut-all", "notification-all"] }
-device_query = "1.1.3"
 xcap = "0.0.3"
 rdev = { git = "https://github.com/fufesou/rdev" }
-png = "0.17.11"
 chrono = "0.4.32"
 reqwest = { version = "0.11.23", features = ["json"] }
 serde_json = "1.0.111"
 serde = { version = "1.0.195", features = ["derive"] }
 tokio = { version = "1.35.1", features = ["full"] }
-notify-rust = "4.10.0"
 htmlentity = "1.3.1"
 image = "0.24.8"
 regex = "1.10.3"
-lazy_static = { version = "1.4.0", features = [] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
 tesseract = "0.15.1"
 base64 = "0.21.7"
