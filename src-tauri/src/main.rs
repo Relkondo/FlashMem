@@ -1,8 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::env;
-use std::process::Command;
+use std::{env};
 use tauri::{generate_context, State};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -30,9 +29,6 @@ impl Default for SettingsState {
 fn set_tessadata_prefix() {
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            #[cfg(debug_assertions)]
-            let relative_path = "libs/tesseract/5.3.4/share/tessdata";
-            #[cfg(not(debug_assertions))]
             let relative_path = "../Resources/libs/tesseract/5.3.4/share/tessdata";
 
             // Construct the absolute path by joining the executable directory with the relative path
@@ -41,16 +37,21 @@ fn set_tessadata_prefix() {
             // Convert the path to a string (if possible)
             if let Some(absolute_path_str) = absolute_path.to_str() {
                 // Set the environment variable to the absolute path
+                println!("Setting TESSDATA_PREFIX to {}", absolute_path_str);
                 env::set_var("TESSDATA_PREFIX", absolute_path_str);
-                println!("Set TESSDATA_PREFIX to {}", absolute_path_str);
             }
-            println!("tessdata_prefix: {}", env::var("TESSDATA_PREFIX").unwrap());
+        } else {
+            eprintln!("TESSDATA_PREFIX cloud not be set: Failed to get the executable directory.");
         }
+    } else {
+        eprintln!("TESSDATA_PREFIX cloud not be set: Failed to get the executable path.");
     }
+    println!("$TESSDATA_PREFIX={}", env::var("TESSDATA_PREFIX").unwrap());
 }
 
 fn main() {
     let _ = fix_path_env::fix();
+    #[cfg(not(debug_assertions))]
     set_tessadata_prefix();
 
     tauri::Builder::default()

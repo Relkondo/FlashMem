@@ -17,7 +17,7 @@ echo "Building..."
 if [ "$PROFILE" == "release" ]; then
   cargo tauri build
 else
-  cargo tauri dev
+  cargo tauri build --debug
 fi
 
 echo "Entering src-tauri..."
@@ -30,9 +30,7 @@ LICENSE_FILE=$(jq -r '.tauri.bundle.macOS.license' tauri.conf.json)
 
 echo "Copying libs inside build..."
 cp -R "libs" "target/$PROFILE/"
-if [ "$PROFILE" == "release" ]; then
-  cp -R "libs" "target/release/bundle/macos/$VOL_NAME.app/Contents/Resources/"
-fi
+cp -R "libs" "target/$PROFILE/bundle/macos/$VOL_NAME.app/Contents/Resources/"
 
 echo "Setting proper @rpath..."
 
@@ -133,10 +131,8 @@ function rebundle_dmg() {
 
 touch bundle_libs_to_add.txt
 process_one_exec "target/$PROFILE/" "libs" "$VOL_NAME" "@executable_path/libs"
-if [ "$PROFILE" == "release" ]; then
-  process_one_exec "target/release/bundle/macos/$VOL_NAME.app/" "Contents/Resources/libs" "Contents/MacOS/$VOL_NAME" "@executable_path/../Resources/libs"
-  rebundle_dmg
-fi
+process_one_exec "target/$PROFILE/bundle/macos/$VOL_NAME.app/" "Contents/Resources/libs" "Contents/MacOS/$VOL_NAME" "@executable_path/../Resources/libs"
+rebundle_dmg
 
 sort -u bundle_libs_to_add.txt -o bundle_libs_to_add.txt
 LIBS_TO_ADD=$(<bundle_libs_to_add.txt)
