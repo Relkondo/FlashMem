@@ -5,14 +5,14 @@
 	export let items: string[] = [];
 	export let label = '';
 	export let placeholder = '';
-	export let defaultPick = '';
+	export let value = '';
 	export let command= '';
-	let search = defaultPick;
+	let defaultPick = value;
 	let showList = false;
 	let dropdownElement: HTMLDivElement;
 
 	$: filteredItems = items.filter(i =>
-		i.toLowerCase().includes(search.toLowerCase())
+		i.toLowerCase().includes(value.toLowerCase())
 	);
 
 	onMount(() => {
@@ -24,11 +24,10 @@
 	});
 
 	function selectItem(item: string) {
-		search = item;
+		value = item;
 		showList = false;
-	  if (command === 'set_shortcut') {
-			dispatch('shortcutSelected', { shortcut: item });
-		} else if (command !== '') {
+		dispatch('valueSelected', { value: item });
+		if (command !== '') {
 			invoke(command, { value: item })
 				.then(() => console.log(`${command}: ${item}`))
 				.catch((err) => console.error(`Failed to ${command}: ${err}`));
@@ -37,13 +36,13 @@
 
 	function closeDropdown() {
 		showList = false;
-		if (!filteredItems.includes(search)) {
-			search = defaultPick;
+		if (!filteredItems.includes(value)) {
+			value = defaultPick;
 		}
 	}
 
 	function handleClickInside() {
-		search = '';
+		value = '';
 		showList = true;
 	}
 
@@ -54,12 +53,12 @@
 	}
 </script>
 <div bind:this={dropdownElement} class="flex items-center bg-gray-800 space-x-3 p-3 rounded-md h-14" on:blur={closeDropdown} tabindex="-1">
-		<label for="search" class="text-white w-1/3">{label}</label>
+		<label for="value" class="text-white w-1/3">{label}</label>
 		<div class="relative w-1/2">
 			<input
 				type="text"
 				placeholder="{placeholder}"
-				bind:value={search}
+				bind:value={value}
 				class="bg-gray-700 w-full text-white px-4 py-2 rounded"
 				on:focus={() => showList = true}
 				on:click={handleClickInside}

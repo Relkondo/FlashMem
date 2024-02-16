@@ -4,14 +4,13 @@ use std::thread;
 use std::time::{Duration, Instant};
 use std::io::{Cursor};
 use reqwest;
-use serde_json::json;
 use translation_response::TranslationResponse;
 use htmlentity::entity::{decode, ICodedDataTrait};
 use image::{RgbaImage};
 use image::imageops::crop_imm;
 use regex::Regex;
 use crate::SettingsState;
-use crate::utils::{get_language_code, get_platform_cropping};
+use crate::utils::{get_google_language_code, get_platform_cropping, get_request_google_ocr, get_request_google_translate, get_tesseract_language_code};
 use xcap::Monitor;
 use crate::execute::vision_response::VisionResponse;
 use base64::{engine::general_purpose, Engine as _};
@@ -35,18 +34,24 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
     let image_data = crop_screenshot(screenshot.clone(), settings.platform.as_str());
     println!("Screenshot cropped in {}ms.", step2.elapsed().as_millis());
     let step3 = Instant::now();
-    let origin_text = execute_ocr(image_data, settings.platform.as_str()).expect("Couldn't execute OCR.");
+    let origin_text = execute_ocr(image_data, settings.platform.as_str(), &settings.origin_language).expect("Couldn't execute OCR.");
     println!("Text extracted in {}ms.", step3.elapsed().as_millis());
     let step4 = Instant::now();
     let formatted_text = format_text(origin_text, settings.platform.as_str());
     println!("Text formatted in {}ms.", step4.elapsed().as_millis());
     let step5 = Instant::now();
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-    let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), get_language_code(settings.target_language.as_str()))).expect("Couldn't translate text.");
+    let (translated_text, detected_source_language) = runtime.block_on(translate_text(formatted_text.clone(), settings.origin_language.as_str(), settings.target_language.as_str())).expect("Couldn't translate text.");
     println!("Text translated in {}ms.", step5.elapsed().as_millis());
-    let step6 = Instant::now();
-    let clean_translation = truncate_translation(&formatted_text, &translated_text);
-    println!("Translation cleaned in {}ms.", step6.elapsed().as_millis());
+    let clean_translation: String;
+    if detected_source_language == Some(get_google_language_code(settings.target_language.as_str()).to_string()) {
+        clean_translation = translated_text;
+        println!("Detected source language is the same as the target language: {}. Skipping truncate.", &settings.target_language);
+    } else {
+        let step6 = Instant::now();
+        clean_translation = truncate_translation(&formatted_text, &translated_text);
+        println!("Translation cleaned in {}ms.", step6.elapsed().as_millis());
+    }
     let step7 = Instant::now();
     let notification = format_notification(&clean_translation, detected_source_language);
     println!("Notification formatted in {}ms.", step7.elapsed().as_millis());
@@ -109,27 +114,15 @@ fn encode_as_webp(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
     Ok(bytes)
 }
 
-async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn std::error::Error>> {
+async fn execute_google_vision_ocr(file: &RgbaImage, lang: &String) -> Result<String, Box<dyn std::error::Error>> {
     let url = format!("https://vision.googleapis.com/v1/images:annotate?key={}", API_KEY);
     let b64 = general_purpose::STANDARD.encode(encode_as_webp(file)?);
+    let request: serde_json::Value = get_request_google_ocr(b64, lang);
     println!("Calling Google Vision...");
     let now = Instant::now();
     let response = reqwest::Client::new()
         .post(&url)
-        .json(&json!({
-            "requests": [
-                {
-                  "image": {
-                    "content": b64
-                  },
-                  "features": [
-                    {
-                      "type": "TEXT_DETECTION"
-                    }
-                  ]
-                }
-            ]
-        }))
+        .json(&request)
         .send()
         .await?;
     let response_body = response.text().await?;
@@ -152,14 +145,15 @@ async fn execute_google_vision_ocr(file: &RgbaImage) -> Result<String, Box<dyn s
     }
 }
 
-fn get_tesseract_result(file: &RgbaImage) -> Result<String, TesseractOriginatedError> {
-    let tesseract: Tesseract = Tesseract::new(None, Some("eng")).unwrap();
+fn get_tesseract_result(file: &RgbaImage, lang: &String) -> Result<String, TesseractOriginatedError> {
+    let code = get_tesseract_language_code(lang.as_str());
+    let tesseract: Tesseract = Tesseract::new(None, Some(code)).unwrap();
     Ok(tesseract.set_image_from_mem(&encode_as_tiff(file)?)?.set_source_resolution(264).get_text()?)
 }
 
-fn execute_tesseract_ocr(file: &RgbaImage) -> Option<String> {
+fn execute_tesseract_ocr(file: &RgbaImage, lang: &String) -> Option<String> {
     println!("Using Tesseract...");
-    let result = get_tesseract_result(file);
+    let result = get_tesseract_result(file, lang);
     match result {
         Ok(text) => {
             println!("Tesseract executed successfully. Result:");
@@ -173,18 +167,18 @@ fn execute_tesseract_ocr(file: &RgbaImage) -> Option<String> {
     }
 }
 
-fn execute_ocr(image_data: RgbaImage, platform: &str) -> Option<String> {
+fn execute_ocr(image_data: RgbaImage, platform: &str, lang: &String) -> Option<String> {
     if platform == "YouTube" || platform == "VLC" {
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-        match runtime.block_on(execute_google_vision_ocr(&image_data)) {
+        match runtime.block_on(execute_google_vision_ocr(&image_data, lang)) {
             Ok(text) => Some(text),
             Err(e) => {
                 eprintln!("Failed to execute Google Vision: {:?}", e);
-                execute_tesseract_ocr(&image_data)
+                execute_tesseract_ocr(&image_data, lang)
             }
         }
     } else {
-        execute_tesseract_ocr(&image_data)
+        execute_tesseract_ocr(&image_data, lang)
     }
 }
 
@@ -238,16 +232,12 @@ fn format_text(text: String, platform: &str) -> String {
     result
 }
 
-async fn translate_text(text: String, target_language: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
+async fn translate_text(text: String, origin_lang_code: &str, target_lang_code: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
     let url = format!("https://translation.googleapis.com/language/translate/v2?key={}", API_KEY);
-
     println!("Calling Google Translate...");
     let response = reqwest::Client::new()
         .post(&url)
-        .json(&json!({
-            "q": text,
-            "target": target_language
-        }))
+        .json(&get_request_google_translate(text, target_lang_code, origin_lang_code))
         .send()
         .await?;
     let response_body = response.text().await?;

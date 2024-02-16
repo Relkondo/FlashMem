@@ -13,6 +13,7 @@ static IS_RUNNING: AtomicBool = AtomicBool::new(false);
 #[derive(Debug)]
 struct SettingsState {
     target_language: String,
+    origin_language: String,
     platform: String
 }
 type SharedSettings = Arc<Mutex<SettingsState>>;
@@ -21,22 +22,18 @@ impl Default for SettingsState {
     fn default() -> Self {
         SettingsState {
             target_language: "English".to_string(),
+            origin_language: "Automatic".to_string(),
             platform: "Default".to_string()
         }
     }
 }
 
-fn set_tessadata_prefix() {
+fn set_tessdata_prefix() {
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
             let relative_path = "../Resources/libs/tesseract/5.3.4/share/tessdata";
-
-            // Construct the absolute path by joining the executable directory with the relative path
             let absolute_path = exe_dir.join(relative_path);
-
-            // Convert the path to a string (if possible)
             if let Some(absolute_path_str) = absolute_path.to_str() {
-                // Set the environment variable to the absolute path
                 println!("Setting TESSDATA_PREFIX to {}", absolute_path_str);
                 env::set_var("TESSDATA_PREFIX", absolute_path_str);
             }
@@ -52,13 +49,14 @@ fn set_tessadata_prefix() {
 fn main() {
     let _ = fix_path_env::fix();
     #[cfg(not(debug_assertions))]
-    set_tessadata_prefix();
+    set_tessdata_prefix();
 
     tauri::Builder::default()
         .manage(SharedSettings::default())
         .invoke_handler(tauri::generate_handler![
         execute,
         set_target_language,
+        set_origin_language,
         set_platform])
         .run(generate_context!())
         .expect("error while running tauri application");
@@ -82,6 +80,18 @@ fn execute(state: State<'_, SharedSettings>) -> String {
 fn set_target_language(value: String, settings: State<'_, SharedSettings>) {
     let mut settings = settings.lock().unwrap();
     settings.target_language = value;
+    if settings.target_language == settings.origin_language {
+        settings.origin_language = "Automatic".to_string();
+    }
+}
+
+#[tauri::command]
+fn set_origin_language(value: String, settings: State<'_, SharedSettings>) {
+    let mut settings = settings.lock().unwrap();
+    settings.origin_language = value;
+    if settings.origin_language == settings.target_language {
+        settings.target_language = if settings.origin_language != "English" {"English".to_string() } else { "Spanish".to_string() };
+    }
 }
 
 #[tauri::command]

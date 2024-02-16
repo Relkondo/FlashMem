@@ -8,7 +8,10 @@
 
 	const TITLE: string = 'FlashMem Translated Sub';
 
-	let languages = ['English', 'French', 'Spanish', 'German', 'Italian'];
+	let target_languages = ['English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
+	let origin_languages = ['Automatic', 'English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
+	let origin_language = 'Automatic';
+	let target_language = 'English';
 	let platforms = ['Default', 'Netflix', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', "YouTube", "VLC"]
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T', 'Ctrl+X', 'Ctrl+Shift+X', 'Ctrl+Alt+X'];
 	let current_shortcut = 'Ctrl+T';
@@ -54,9 +57,24 @@
 		}
 	}
 
+	function handleOriginLanguageSelected(event: CustomEvent) {
+		origin_language = event.detail.value;
+		if (origin_language == target_language) {
+			target_language = origin_language == "English"? "Spanish" : "English";
+		}
+	}
+
+	function handleTargetLanguageSelected(event: CustomEvent) {
+		target_language = event.detail.value;
+		if (origin_language == target_language) {
+			origin_language = "Automatic";
+		}
+	}
+
+
 	function handleShortcutSelected(event: CustomEvent) {
-		register_shortcut(event.detail.shortcut);
-		console.log('Shortcut selected:', event.detail.shortcut);
+		register_shortcut(event.detail.value);
+		console.log('Shortcut selected:', event.detail.value);
 	}
 
 </script>
@@ -68,11 +86,13 @@
 		<p>Just make sure you watch the movie fullscreen!</p>
 	</div>
 	<div class="w-full space-y-3 max-w-md">
-		<SettingsPicker items={languages} label="Translate to..." placeholder="Pick a target language..."
-										defaultPick="English" command="set_target_language" />
+		<SettingsPicker items={origin_languages} label="Translate from..." placeholder="Pick an origin language..."
+										value={origin_language} command="set_origin_language" on:valueSelected={handleOriginLanguageSelected} />
+		<SettingsPicker items={target_languages} label="Translate to..." placeholder="Pick a target language..."
+										value={target_language} command="set_target_language" on:valueSelected={handleTargetLanguageSelected} />
 		<SettingsPicker items={platforms} label="Optimize for..." placeholder="Pick a platform..."
-										defaultPick="Default" command="set_platform"/>
+										value="Default" command="set_platform"/>
 		<SettingsPicker items={shortcuts} label="Shortcut to press..." placeholder="Pick a shortcut..."
-										defaultPick="Ctrl+T" command="set_shortcut" on:shortcutSelected={handleShortcutSelected} />
+										value="Ctrl+T" on:valueSelected={handleShortcutSelected} />
 	</div>
 </div>
