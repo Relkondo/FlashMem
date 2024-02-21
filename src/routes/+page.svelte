@@ -4,10 +4,12 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { register, unregisterAll } from '@tauri-apps/api/globalShortcut';
 	import { invoke } from '@tauri-apps/api/tauri';
+	import { open } from '@tauri-apps/api/shell';
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
 
 	const TITLE: string = 'FlashMem Translated Sub';
-
+	const APPLE_HELP_RECORDING_SCREEN_LINK: string = 'https://support.apple.com/guide/mac-help/control-access-screen-system-audio-recording-mchld6aa7d23/mac';
+	const APPLE_HELP_NOTIFICATIONS_LINK: string = 'https://support.apple.com/fr-fr/guide/mac-help/mh40583/mac';
 	let target_languages = ['English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
 	let origin_languages = ['Automatic', 'English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
 	let origin_language = 'Automatic';
@@ -15,6 +17,7 @@
 	let platforms = ['Default', 'Netflix', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', "YouTube", "VLC"]
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T', 'Ctrl+X', 'Ctrl+Shift+X', 'Ctrl+Alt+X'];
 	let current_shortcut = 'Ctrl+T';
+	let showHelpLink = false;
 
 	onMount(async () => {
 		await register_shortcut('Ctrl+T');
@@ -77,7 +80,29 @@
 		console.log('Shortcut selected:', event.detail.value);
 	}
 
+	function toggleHelpLink() {
+		showHelpLink = !showHelpLink;
+	}
+
+	async function openRecordingScreenHelpLink() {
+		await open(APPLE_HELP_RECORDING_SCREEN_LINK);
+	}
+
+	async function openNotificationsHelpLink() {
+		await open(APPLE_HELP_NOTIFICATIONS_LINK);
+	}
+
 </script>
+
+<style>
+    .link-button {
+        background: none;
+        border: none;
+        padding: 0;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+</style>
 
 <div class="min-h-screen bg-gray-900 p-8 flex flex-col items-center">
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">
@@ -94,5 +119,15 @@
 										value="Default" command="set_platform"/>
 		<SettingsPicker items={shortcuts} label="Shortcut to press..." placeholder="Pick a shortcut..."
 										value="Ctrl+T" on:valueSelected={handleShortcutSelected} />
+	</div>
+
+	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">
+		<p class="text-center">It's not working, <button class="link-button" on:click={toggleHelpLink}>help!</button></p>
+	{#if showHelpLink}
+		<br/>
+		<p class="mb-2">=> Make sure you allowed FlashMem to <button class="link-button" on:click={openRecordingScreenHelpLink}>record your screen</button></p>
+		<p class="mb-2">=> Make sure you allowed FlashMem to <button class="link-button" on:click={openNotificationsHelpLink}>send you notifications</button></p>
+		<p class="mb-2">=> Make sure you watch the movie fullscreen!</p>
+	{/if}
 	</div>
 </div>

@@ -17,6 +17,9 @@
       "globalShortcut": {
         "all": true
       },
+      "shell": {
+        "open": true
+      },
       "all": false
     },
     "bundle": {

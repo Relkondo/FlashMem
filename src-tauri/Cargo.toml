@@ -15,7 +15,7 @@ rust-version = "1.60"
 tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
-tauri = { version = "1.5.4", features = [ "global-shortcut-all", "notification-all"] }
+tauri = { version = "1.5.4", features = [ "shell-open", "global-shortcut-all", "notification-all"] }
 xcap = "0.0.3"
 rdev = { git = "https://github.com/fufesou/rdev" }
 chrono = "0.4.32"
