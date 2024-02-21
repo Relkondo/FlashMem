@@ -108,7 +108,6 @@
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">
 		<h1 class="text-xl text-center font-bold mb-2">Welcome to FlashMem!</h1>
 		<p>Automatically translate and save subs when watching movies with just a shortcut.</p>
-		<p>Just make sure you watch the movie fullscreen!</p>
 	</div>
 	<div class="w-full space-y-3 max-w-md">
 		<SettingsPicker items={origin_languages} label="Translate from..." placeholder="Pick an origin language..."
@@ -122,12 +121,14 @@
 	</div>
 
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">
-		<p class="text-center">It's not working, <button class="link-button" on:click={toggleHelpLink}>help!</button></p>
 	{#if showHelpLink}
+		<p class="text-center"><button class="link-button" on:click={toggleHelpLink}>Got it!</button></p>
 		<br/>
-		<p class="mb-2">=> Make sure you allowed FlashMem to <button class="link-button" on:click={openRecordingScreenHelpLink}>record your screen</button></p>
-		<p class="mb-2">=> Make sure you allowed FlashMem to <button class="link-button" on:click={openNotificationsHelpLink}>send you notifications</button></p>
-		<p class="mb-2">=> Make sure you watch the movie fullscreen!</p>
+		<li class="mb-2">Make sure you allowed FlashMem to <button class="link-button" on:click={openRecordingScreenHelpLink}>record your screen</button></li>
+		<li class="mb-2">Make sure you allowed FlashMem to <button class="link-button" on:click={openNotificationsHelpLink}>send you notifications</button></li>
+		<li class="mb-2">Make sure you watch the movie fullscreen!</li>
+	{:else}
+		<p class="text-center">It's not working, <button class="link-button" on:click={toggleHelpLink}>help!</button></p>
 	{/if}
 	</div>
 </div>
