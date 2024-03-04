@@ -102,12 +102,15 @@
         text-decoration: underline;
         cursor: pointer;
     }
+		.link-button:hover {
+        color: rgb(34 197 94);
+    }
 </style>
 
-<div class="min-h-screen bg-gray-900 p-8 flex flex-col items-center">
+<div class="min-h-screen bg-gray-900 flex flex-col items-center">
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">
 		<h1 class="text-xl text-center font-bold mb-2">Welcome to FlashMem!</h1>
-		<p>Automatically translate and save subs when watching movies with just a shortcut.</p>
+		<p>Automatically translate and save movies subs. Just press a shortcut while watching!</p>
 	</div>
 	<div class="w-full space-y-3 max-w-md">
 		<SettingsPicker items={origin_languages} label="Translate from..." placeholder="Pick an origin language..."
