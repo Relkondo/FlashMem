@@ -6,6 +6,7 @@
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { open } from '@tauri-apps/api/shell';
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
+	import { savedSubs } from '../stores/store';
 
 	const TITLE: string = 'FlashMem Translated Sub';
 	const APPLE_HELP_RECORDING_SCREEN_LINK: string = 'https://support.apple.com/guide/mac-help/control-access-screen-system-audio-recording-mchld6aa7d23/mac';
@@ -38,12 +39,24 @@
 		}
 	}
 
+	function format_notification(translated_text: string, detected_source_language: string) {
+		if (detected_source_language != "") {
+			translated_text += `\n[Detected Source Language: ${detected_source_language}]`;
+		}
+		return translated_text;
+	}
+
 	async function execute() {
 		console.log(current_shortcut + ' pressed');
-		let notification: string = await invoke('execute');
-		if (notification !== '###-Already Running-###') {
+		let savedSub: {original_text: string, translated_text: string, detected_source_language: string, timestamp: number} = await invoke('execute');
+		savedSub.timestamp = Date.now();
+		if (savedSub.original_text !== '###-Already Running-###') {
+			savedSubs.update(currentSubs => [
+				...currentSubs,
+				savedSub
+			]);
 			console.log('Sending notification...');
-			await send_notification(TITLE, notification);
+			await send_notification(TITLE, format_notification(savedSub.translated_text, savedSub.detected_source_language));
 		} else {
 			console.log('Cannot send notification, previous notification still in progress...');
 		}

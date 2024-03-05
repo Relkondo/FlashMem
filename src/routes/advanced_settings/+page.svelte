@@ -1,1 +1,1 @@
-<h1>Advanced Settings</h1>
+<h1></h1>

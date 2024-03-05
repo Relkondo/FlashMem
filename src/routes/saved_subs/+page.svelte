@@ -1,1 +1,5 @@
-<h1>Saved Subs</h1>
+<script>
+	import SavedSubs from '$lib/SavedSubs.svelte';
+</script>
+
+<SavedSubs />

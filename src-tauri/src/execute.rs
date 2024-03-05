@@ -2,29 +2,30 @@ use std::any::Any;
 use std::sync::MutexGuard;
 use std::thread;
 use std::time::{Duration, Instant};
-use std::io::{Cursor};
+use std::io::Cursor;
 use reqwest;
 use translation_response::TranslationResponse;
 use htmlentity::entity::{decode, ICodedDataTrait};
-use image::{RgbaImage};
+use image::RgbaImage;
 use image::imageops::crop_imm;
 use regex::Regex;
 use crate::SettingsState;
 use crate::utils::{get_google_language_code, get_platform_cropping, get_request_google_ocr, get_request_google_translate, get_tesseract_language_code};
 use xcap::Monitor;
 use crate::execute::vision_response::VisionResponse;
-use base64::{engine::general_purpose, Engine as _};
-use tesseract::{Tesseract};
+use base64::{Engine as _, engine::general_purpose};
+use tesseract::Tesseract;
+use crate::execute::saved_sub::SavedSub;
 use crate::execute::tesseract_originated_error::TesseractOriginatedError;
 
 mod translation_response;
 mod vision_response;
 mod tesseract_originated_error;
+pub(crate) mod saved_sub;
 
-static FOOTER_START: &'static str = "[Detected Source Language:";
 static API_KEY: &'static str = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A";
 
-pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
+pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> SavedSub {
     println!("Executing FlashMem...");
     let total = Instant::now();
     let step1 = Instant::now();
@@ -52,12 +53,12 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> String {
         clean_translation = truncate_translation(&formatted_text, &translated_text);
         println!("Translation cleaned in {}ms.", step6.elapsed().as_millis());
     }
-    let step7 = Instant::now();
-    let notification = format_notification(&clean_translation, detected_source_language);
-    println!("Notification formatted in {}ms.", step7.elapsed().as_millis());
     println!("TOTAL ELAPSED: {}ms.", total.elapsed().as_millis());
-    println!("Sending the following notification:\n{}", notification);
-    notification
+    println!("Sending the following notification:\n{}", &clean_translation);
+    SavedSub{ original_text: formatted_text,
+        translated_text: clean_translation,
+        detected_source_language: detected_source_language.unwrap_or("".to_string())
+    }
 }
 
 fn capture_screenshot() -> Option<RgbaImage> {
@@ -285,12 +286,4 @@ fn truncate_translation(untranslated: &str, translated: &str) -> String {
         }
     }
     result.trim_end().to_string()
-}
-
-fn format_notification(translated_text: &str, detected_source_language: Option<String>) -> String {
-    let mut notification = translated_text.to_string();
-    if let Some(source_language) = detected_source_language {
-        notification.push_str(&format!("\n{} {:?}]", FOOTER_START, source_language));
-    }
-    notification
 }

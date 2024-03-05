@@ -1,13 +1,14 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env};
+use std::env;
 use tauri::{generate_context, State};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 mod execute;
 mod utils;
+use crate::execute::saved_sub::SavedSub;
 
 static DEBUG_TESSDATA_PATH: &'static str = "libs/tesseract/5.3.4/share/tessdata";
 static RELEASE_TESSDATA_PATH: &'static str = "../Resources/libs/tesseract/5.3.4/share/tessdata";
@@ -67,16 +68,20 @@ fn main() {
 }
 
 #[tauri::command]
-fn execute(state: State<'_, SharedSettings>) -> String {
+fn execute(state: State<'_, SharedSettings>) -> SavedSub {
     if !IS_RUNNING.load(Ordering::SeqCst) {
         IS_RUNNING.store(true, Ordering::SeqCst);
         let settings: MutexGuard<SettingsState> = state.lock().unwrap();
-        let notification = execute::execute(settings);
+        let result = execute::execute(settings);
         IS_RUNNING.store(false, Ordering::SeqCst);
-        notification
+        result
     } else {
         println!("Received signal but FlashMem is already running.");
-        "###-Already Running-###".to_string()
+        SavedSub {
+            original_text: "###-Already Running-###".to_string(),
+            translated_text: "".to_string(),
+            detected_source_language: "".to_string()
+        }
     }
 }
 

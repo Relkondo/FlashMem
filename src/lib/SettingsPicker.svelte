@@ -66,7 +66,7 @@
 			{#if showList}
 				<div class="absolute flex flex-col w-full bg-gray-700 max-h-60 overflow-auto rounded-b-md z-50">
 					{#each filteredItems as item}
-						<button class="text-white text-left p-2 hover:bg-green-600 cursor-pointer" on:click={() => selectItem(item)}>{item}</button>
+						<button class="text-white text-left p-2 hover:bg-green-700 transition-colors cursor-pointer" on:click={() => selectItem(item)}>{item}</button>
 					{/each}
 				</div>
 			{/if}
