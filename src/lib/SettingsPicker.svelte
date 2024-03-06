@@ -1,22 +1,31 @@
 <script lang="ts">
 	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 	import { invoke } from '@tauri-apps/api/tauri';
+	import { writable } from 'svelte/store';
 	const dispatch = createEventDispatcher();
 	export let items: string[] = [];
 	export let label = '';
 	export let placeholder = '';
-	export let value = '';
+	export let setting = writable('');
 	export let command= '';
-	let defaultPick = value;
 	let showList = false;
 	let dropdownElement: HTMLDivElement;
+	let displayedValue = $setting;
 
 	$: filteredItems = items.filter(i =>
-		i.toLowerCase().includes(value.toLowerCase())
+		i.toLowerCase().includes(displayedValue.toLowerCase())
 	);
 
 	onMount(() => {
 		document.addEventListener('click', handleClickOutside);
+		setting.subscribe((val) => {
+			displayedValue = val;
+			if (command !== '') {
+				invoke(command, { value: val })
+					.then(() => console.log(`${command}: ${val}`))
+					.catch((err) => console.error(`Failed to ${command}: ${err}`));
+			}
+		});
 	});
 
 	onDestroy(() => {
@@ -24,25 +33,20 @@
 	});
 
 	function selectItem(item: string) {
-		value = item;
+		setting.set(item);
 		showList = false;
 		dispatch('valueSelected', { value: item });
-		if (command !== '') {
-			invoke(command, { value: item })
-				.then(() => console.log(`${command}: ${item}`))
-				.catch((err) => console.error(`Failed to ${command}: ${err}`));
-		}
 	}
 
 	function closeDropdown() {
 		showList = false;
-		if (!filteredItems.includes(value)) {
-			value = defaultPick;
+		if (!filteredItems.includes(displayedValue)) {
+			displayedValue = $setting;
 		}
 	}
 
 	function handleClickInside() {
-		value = '';
+		displayedValue = '';
 		showList = true;
 	}
 
@@ -52,13 +56,14 @@
 		}
 	}
 </script>
+
 <div bind:this={dropdownElement} class="flex items-center bg-gray-800 space-x-3 p-3 rounded-md h-14" on:blur={closeDropdown} tabindex="-1">
 		<label for="value" class="text-white w-1/3">{label}</label>
 		<div class="relative w-1/2">
 			<input
 				type="text"
-				placeholder="{placeholder}"
-				bind:value={value}
+				placeholder={placeholder}
+				bind:value={displayedValue}
 				class="bg-gray-700 w-full text-white px-4 py-2 rounded"
 				on:focus={() => showList = true}
 				on:click={handleClickInside}

@@ -6,18 +6,15 @@
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { open } from '@tauri-apps/api/shell';
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
-	import { savedSubs } from '../stores/store';
+	import { savedSubs, origin_language, target_language, platform, shortcut } from '../stores/store';
 
 	const TITLE: string = 'FlashMem Translated Sub';
 	const APPLE_HELP_RECORDING_SCREEN_LINK: string = 'https://support.apple.com/guide/mac-help/control-access-screen-system-audio-recording-mchld6aa7d23/mac';
 	const APPLE_HELP_NOTIFICATIONS_LINK: string = 'https://support.apple.com/fr-fr/guide/mac-help/mh40583/mac';
 	let target_languages = ['English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
 	let origin_languages = ['Automatic', 'English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
-	let origin_language = 'Automatic';
-	let target_language = 'English';
 	let platforms = ['Default', 'Netflix', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', "YouTube", "VLC"]
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T', 'Ctrl+X', 'Ctrl+Shift+X', 'Ctrl+Alt+X'];
-	let current_shortcut = 'Ctrl+T';
 	let showHelpLink = false;
 
 	onMount(async () => {
@@ -28,14 +25,14 @@
 		await unregisterAll();
 	});
 
-	async function register_shortcut(shortcut: string) {
+	async function register_shortcut(new_shortcut: string) {
 		try {
 			await unregisterAll();
-			await register(shortcut, execute);
-			current_shortcut = shortcut;
-			console.log('Shortcut ' + shortcut + ' registered');
+			await register(new_shortcut, execute);
+			shortcut.set(new_shortcut);
+			console.log('Shortcut ' + new_shortcut + ' registered');
 		} catch (error) {
-			console.error('Error registering shortcut ' + shortcut + ' :', error);
+			console.error('Error registering shortcut ' + new_shortcut + ' :', error);
 		}
 	}
 
@@ -47,18 +44,22 @@
 	}
 
 	async function execute() {
-		console.log(current_shortcut + ' pressed');
+		console.log(shortcut + ' pressed');
 		let savedSub: {original_text: string, translated_text: string, detected_source_language: string, timestamp: number} = await invoke('execute');
 		savedSub.timestamp = Date.now();
-		if (savedSub.original_text !== '###-Already Running-###') {
-			savedSubs.update(currentSubs => [
-				...currentSubs,
-				savedSub
-			]);
-			console.log('Sending notification...');
-			await send_notification(TITLE, format_notification(savedSub.translated_text, savedSub.detected_source_language));
-		} else {
+		if (savedSub.original_text === '###-Already Running-###') {
 			console.log('Cannot send notification, previous notification still in progress...');
+		} else {
+			console.log('Sending notification...');
+			if (savedSub.original_text.trim() === '') {
+				await send_notification("FlashMem Error", 'No subtitles found!');
+			} else {
+				savedSubs.update(currentSubs => [
+					...currentSubs,
+					savedSub
+				]);
+				await send_notification(TITLE, format_notification(savedSub.translated_text, savedSub.detected_source_language));
+			}
 		}
 	}
 
@@ -74,16 +75,16 @@
 	}
 
 	function handleOriginLanguageSelected(event: CustomEvent) {
-		origin_language = event.detail.value;
-		if (origin_language == target_language) {
-			target_language = origin_language == "English"? "Spanish" : "English";
+		origin_language.set(event.detail.value);
+		if ($origin_language == $target_language) {
+			target_language.update(() => $origin_language == "English" ? "Spanish" : "English");
 		}
 	}
 
 	function handleTargetLanguageSelected(event: CustomEvent) {
-		target_language = event.detail.value;
-		if (origin_language == target_language) {
-			origin_language = "Automatic";
+		target_language.set(event.detail.value);
+		if ($origin_language == $target_language) {
+			origin_language.set("Automatic");
 		}
 	}
 
@@ -127,13 +128,13 @@
 	</div>
 	<div class="w-full space-y-3 max-w-md">
 		<SettingsPicker items={origin_languages} label="Translate from..." placeholder="Pick an origin language..."
-										value={origin_language} command="set_origin_language" on:valueSelected={handleOriginLanguageSelected} />
+										setting={origin_language} command="set_origin_language" on:valueSelected={handleOriginLanguageSelected} />
 		<SettingsPicker items={target_languages} label="Translate to..." placeholder="Pick a target language..."
-										value={target_language} command="set_target_language" on:valueSelected={handleTargetLanguageSelected} />
+										setting={target_language} command="set_target_language" on:valueSelected={handleTargetLanguageSelected} />
 		<SettingsPicker items={platforms} label="Optimize for..." placeholder="Pick a platform..."
-										value="Default" command="set_platform"/>
+										setting={platform} command="set_platform"/>
 		<SettingsPicker items={shortcuts} label="Shortcut to press..." placeholder="Pick a shortcut..."
-										value="Ctrl+T" on:valueSelected={handleShortcutSelected} />
+										setting={shortcut} on:valueSelected={handleShortcutSelected} />
 	</div>
 
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">

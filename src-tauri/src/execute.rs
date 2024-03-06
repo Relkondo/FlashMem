@@ -46,7 +46,7 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> SavedSub {
     println!("Text translated in {}ms.", step5.elapsed().as_millis());
     let clean_translation: String;
     if detected_source_language == Some(get_google_language_code(settings.target_language.as_str()).to_string()) {
-        clean_translation = translated_text;
+        clean_translation = translated_text.trim().to_string();
         println!("Detected source language is the same as the target language: {}. Skipping truncate.", &settings.target_language);
     } else {
         let step6 = Instant::now();
