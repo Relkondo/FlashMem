@@ -77,11 +77,12 @@
 			 class="hover:text-green-500 py-4 px-5 text-center align-middle transition-colors duration-300 rounded leading-loose
 				{$page.url.pathname === '/saved_subs' ? 'bg-gray-800':''}">
 			Saved Subs</a>
-		<a href="/advanced_settings"
-			 class="hover:text-green-500 py-4 px-5 text-center align-middle transition-colors duration-300 rounded leading-loose
-				{$page.url.pathname === '/advanced_settings' ? 'bg-gray-800':''}">
-			Advanced Settings</a>
+<!--		<a href="/advanced_settings"-->
+<!--			 class="hover:text-green-500 py-4 px-5 text-center align-middle transition-colors duration-300 rounded leading-loose-->
+<!--				{$page.url.pathname === '/advanced_settings' ? 'bg-gray-800':''}">-->
+<!--			Advanced Settings</a>-->
 	</nav>
 </div>
-
-<slot />
+<div class="p-4 overflow-auto">
+	<slot />
+</div>

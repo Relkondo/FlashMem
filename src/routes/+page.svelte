@@ -12,7 +12,7 @@
 	let platforms = ['Default', 'Netflix', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', "YouTube", "VLC"]
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T', 'Ctrl+X', 'Ctrl+Shift+X', 'Ctrl+Alt+X'];
 	let showHelpLink = false;
-	const register_shortcut = getContext('register_shortcut');
+	const register_shortcut: never = getContext('register_shortcut');
 
 
 	function handleOriginLanguageSelected(event: CustomEvent) {
@@ -61,8 +61,8 @@
     }
 </style>
 
-<div class="min-h-screen bg-gray-900 flex flex-col items-center">
-	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto my-8">
+<div class="flex flex-col items-center">
+	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto mb-8">
 		<h1 class="text-xl text-center font-bold mb-2">Welcome to FlashMem!</h1>
 		<p>Automatically translate and save movies subs. Just press a shortcut while watching!</p>
 	</div>
