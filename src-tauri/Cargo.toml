@@ -1,11 +1,11 @@
 [package]
-name = "flash_mem"
+name = "flash_sub"
 version = "0.1.0"
 description = "A Tauri App to instantly translate subtitles and save them"
 authors = ["Samuel Coron"]
 license = ""
 repository = ""
-default-run = "flash_mem"
+default-run = "flash_sub"
 edition = "2021"
 rust-version = "1.60"
 
