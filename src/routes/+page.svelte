@@ -63,7 +63,7 @@
 
 <div class="flex flex-col items-center pt-4">
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto mb-8">
-		<h1 class="text-xl text-center font-bold mb-2">Welcome to FlashMem!</h1>
+		<h1 class="text-xl text-center font-bold mb-2">Welcome to FlashSub!</h1>
 		<p>Automatically translate and save movies subs. Just press a shortcut while watching!</p>
 	</div>
 	<div class="w-full space-y-3 max-w-md">
@@ -81,8 +81,8 @@
 	{#if showHelpLink}
 		<p class="text-center"><button class="link-button" on:click={toggleHelpLink}>Got it!</button></p>
 		<br/>
-		<li class="mb-2">Make sure you allowed FlashMem to <button class="link-button" on:click={openRecordingScreenHelpLink}>record your screen</button></li>
-		<li class="mb-2">Make sure you allowed FlashMem to <button class="link-button" on:click={openNotificationsHelpLink}>send you notifications</button></li>
+		<li class="mb-2">Make sure you allowed FlashSub to <button class="link-button" on:click={openRecordingScreenHelpLink}>record your screen</button></li>
+		<li class="mb-2">Make sure you allowed FlashSub to <button class="link-button" on:click={openNotificationsHelpLink}>send you notifications</button></li>
 		<li class="mb-2">Make sure you watch the movie fullscreen!</li>
 	{:else}
 		<p class="text-center">It's not working, <button class="link-button" on:click={toggleHelpLink}>help!</button></p>

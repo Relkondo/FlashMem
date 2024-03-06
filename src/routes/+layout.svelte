@@ -8,7 +8,7 @@
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
 
-	const TITLE: string = 'FlashMem Translated Sub';
+	const TITLE: string = 'FlashSub Translated Sub';
 
 	onMount(async() => register_shortcut($shortcut));
 
@@ -36,7 +36,7 @@
 		} else {
 			console.log('Sending notification...');
 			if (savedSub.original_text.trim() === '') {
-				await send_notification("FlashMem Error", 'No subtitles found!');
+				await send_notification("FlashSub Error", 'No subtitles found!');
 			} else {
 				savedSubs.update(currentSubs => [
 					...currentSubs,

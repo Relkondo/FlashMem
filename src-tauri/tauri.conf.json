@@ -37,7 +37,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.flashmem.dev",
+      "identifier": "com.flashSub.dev",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -67,7 +67,7 @@
         "fullscreen": false,
         "height": 600,
         "resizable": true,
-        "title": "FlashMem",
+        "title": "FlashSub",
         "width": 800
       }
     ]

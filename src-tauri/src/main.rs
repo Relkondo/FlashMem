@@ -76,7 +76,7 @@ fn execute(state: State<'_, SharedSettings>) -> SavedSub {
         IS_RUNNING.store(false, Ordering::SeqCst);
         result
     } else {
-        println!("Received signal but FlashMem is already running.");
+        println!("Received signal but FlashSub is already running.");
         SavedSub {
             original_text: "###-Already Running-###".to_string(),
             translated_text: "".to_string(),

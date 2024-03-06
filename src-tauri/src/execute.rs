@@ -26,7 +26,7 @@ pub(crate) mod saved_sub;
 static API_KEY: &'static str = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A";
 
 pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> SavedSub {
-    println!("Executing FlashMem...");
+    println!("Executing FlashSub...");
     let total = Instant::now();
     let step1 = Instant::now();
     let screenshot = capture_screenshot().expect("Couldn't capture screenshot.");
