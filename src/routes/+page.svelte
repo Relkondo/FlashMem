@@ -61,7 +61,7 @@
     }
 </style>
 
-<div class="flex flex-col items-center">
+<div class="flex flex-col items-center pt-4">
 	<div class="text-white bg-gray-800 p-4 rounded shadow-lg max-w-4xl mx-auto mb-8">
 		<h1 class="text-xl text-center font-bold mb-2">Welcome to FlashMem!</h1>
 		<p>Automatically translate and save movies subs. Just press a shortcut while watching!</p>

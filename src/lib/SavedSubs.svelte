@@ -10,7 +10,7 @@
 	}
 </script>
 
-<div class="flex flex-col-reverse space-y-4 space-y-reverse">
+<div class="flex flex-col-reverse space-y-4 space-y-reverse pt-2 max-w-3xl">
 	{#each $savedSubs as { original_text, translated_text, detected_source_language, timestamp }}
 		<div class="relative flex bg-gray-800 p-3 rounded-lg">
 			<button class=" absolute top-0 right-0 text-sm text-right align-text-top text-gray-400 px-2"
