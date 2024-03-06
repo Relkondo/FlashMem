@@ -1,14 +1,10 @@
 <script lang="ts">
 	import '../app.css';
 	import SettingsPicker from '$lib/SettingsPicker.svelte';
-	import { onMount, onDestroy } from 'svelte';
-	import { register, unregisterAll } from '@tauri-apps/api/globalShortcut';
-	import { invoke } from '@tauri-apps/api/tauri';
 	import { open } from '@tauri-apps/api/shell';
-	import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
-	import { savedSubs, origin_language, target_language, platform, shortcut } from '../stores/store';
+	import { origin_language, target_language, platform, shortcut } from '../stores/store';
+	import { getContext } from 'svelte';
 
-	const TITLE: string = 'FlashMem Translated Sub';
 	const APPLE_HELP_RECORDING_SCREEN_LINK: string = 'https://support.apple.com/guide/mac-help/control-access-screen-system-audio-recording-mchld6aa7d23/mac';
 	const APPLE_HELP_NOTIFICATIONS_LINK: string = 'https://support.apple.com/fr-fr/guide/mac-help/mh40583/mac';
 	let target_languages = ['English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese', 'Korean', 'Japanese', 'Chinese', 'Vietnamese', 'Russian', 'Arabic', 'Hindi', 'Indonesian', 'Turkish'];
@@ -16,63 +12,8 @@
 	let platforms = ['Default', 'Netflix', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', "YouTube", "VLC"]
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T', 'Ctrl+X', 'Ctrl+Shift+X', 'Ctrl+Alt+X'];
 	let showHelpLink = false;
+	const register_shortcut = getContext('register_shortcut');
 
-	onMount(async () => {
-		await register_shortcut('Ctrl+T');
-	});
-
-	onDestroy(async () => {
-		await unregisterAll();
-	});
-
-	async function register_shortcut(new_shortcut: string) {
-		try {
-			await unregisterAll();
-			await register(new_shortcut, execute);
-			shortcut.set(new_shortcut);
-			console.log('Shortcut ' + new_shortcut + ' registered');
-		} catch (error) {
-			console.error('Error registering shortcut ' + new_shortcut + ' :', error);
-		}
-	}
-
-	function format_notification(translated_text: string, detected_source_language: string) {
-		if (detected_source_language != "") {
-			translated_text += `\n[Detected Source Language: ${detected_source_language}]`;
-		}
-		return translated_text;
-	}
-
-	async function execute() {
-		console.log(shortcut + ' pressed');
-		let savedSub: {original_text: string, translated_text: string, detected_source_language: string, timestamp: number} = await invoke('execute');
-		savedSub.timestamp = Date.now();
-		if (savedSub.original_text === '###-Already Running-###') {
-			console.log('Cannot send notification, previous notification still in progress...');
-		} else {
-			console.log('Sending notification...');
-			if (savedSub.original_text.trim() === '') {
-				await send_notification("FlashMem Error", 'No subtitles found!');
-			} else {
-				savedSubs.update(currentSubs => [
-					...currentSubs,
-					savedSub
-				]);
-				await send_notification(TITLE, format_notification(savedSub.translated_text, savedSub.detected_source_language));
-			}
-		}
-	}
-
-	async function send_notification(title: string, notification: string) {
-		let permissionGranted = await isPermissionGranted();
-		if (!permissionGranted) {
-			const permission = await requestPermission();
-			permissionGranted = permission === 'granted';
-		}
-		if (permissionGranted) {
-			sendNotification({ title: title, body: notification });
-		}
-	}
 
 	function handleOriginLanguageSelected(event: CustomEvent) {
 		origin_language.set(event.detail.value);
@@ -87,7 +28,6 @@
 			origin_language.set("Automatic");
 		}
 	}
-
 
 	function handleShortcutSelected(event: CustomEvent) {
 		register_shortcut(event.detail.value);
