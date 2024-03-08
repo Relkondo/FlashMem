@@ -16,8 +16,8 @@
 			<button class=" absolute top-0 right-0 text-sm text-right align-text-top text-gray-400 px-2"
 							on:click={() => deleteSub(original_text, timestamp)}>x</button>
 			<div class="flex-auto flex flex-col w-2/3">
-				<p class="text-green-400 text-sm pb-1">{original_text}</p>
-				<p class="text-gray-300 text-sm">{translated_text}</p>
+				<p class="text-green-400 text-sm pb-1 text-ellipsis overflow-hidden">{original_text}</p>
+				<p class="text-gray-300 text-sm text-ellipsis overflow-hidden">{translated_text}</p>
 			</div>
 			<div class="flex-auto flex flex-col justify-end w-1/3 pt-2">
 				{#if detected_source_language !== ''}
