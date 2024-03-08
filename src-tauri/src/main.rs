@@ -10,7 +10,7 @@ mod execute;
 mod utils;
 use crate::execute::saved_sub::SavedSub;
 
-static DEBUG_TESSDATA_PATH: &'static str = "libs/tesseract/5.3.4/share/tessdata";
+static DEBUG_TESSDATA_PATH: &'static str = "../../libs/tesseract/5.3.4/share/tessdata";
 static RELEASE_TESSDATA_PATH: &'static str = "../Resources/libs/tesseract/5.3.4/share/tessdata";
 
 static IS_RUNNING: AtomicBool = AtomicBool::new(false);

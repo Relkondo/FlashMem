@@ -15,6 +15,7 @@ use xcap::Monitor;
 use crate::execute::vision_response::VisionResponse;
 use base64::{Engine as _, engine::general_purpose};
 use tesseract::Tesseract;
+use crate::execute::identify_character::get_char_identification_function;
 use crate::execute::saved_sub::SavedSub;
 use crate::execute::tesseract_originated_error::TesseractOriginatedError;
 
@@ -22,6 +23,7 @@ mod translation_response;
 mod vision_response;
 mod tesseract_originated_error;
 pub(crate) mod saved_sub;
+mod identify_character;
 
 static API_KEY: &'static str = "AIzaSyAoTyGq4l6wdF3GFjyLHNdslpuQ7IHV96A";
 
@@ -38,7 +40,7 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> SavedSub {
     let origin_text = execute_ocr(image_data, settings.platform.as_str(), &settings.origin_language).expect("Couldn't execute OCR.");
     println!("Text extracted in {}ms.", step3.elapsed().as_millis());
     let step4 = Instant::now();
-    let formatted_text = format_text(origin_text, settings.platform.as_str());
+    let formatted_text = format_text(origin_text, settings.platform.as_str(),  &settings.origin_language);
     println!("Text formatted in {}ms.", step4.elapsed().as_millis());
     let step5 = Instant::now();
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
@@ -183,25 +185,32 @@ fn execute_ocr(image_data: RgbaImage, platform: &str, lang: &String) -> Option<S
     }
 }
 
-fn valid_end_sentence(text: &str) -> bool {
+fn valid_end_sentence(text: &str, origin_language: &str) -> bool {
+    origin_language == "Chinese" || origin_language == "Chinese Traditional" || origin_language == "Japanese" || origin_language == "Korean" ||
     text.ends_with('.') || text.ends_with('!') || text.ends_with('?') || text.ends_with(':')
 }
 
-fn line_is_invalid(text: &str) -> bool {
-    let len = text.len();
+fn is_invalid_symbol(c: char) -> bool {
+    c >= '\u{00A0}' && c <= '\u{00BF}'
+}
+
+fn line_is_invalid(text: &str, valid_char: fn(char) -> bool, origin_language: &str) -> bool {
+    let len = text.chars().count();
     let mut numeric_nb = 0;
-    let mut alpha_nb = 0;
+    let mut script_nb = 0;
+    let mut symbols_nb = 0;
     for c in text.chars() {
-        if c == '©' || c == '©' || c == '™' {
-            return false;
-        } else if c.is_alphabetic() {
-            alpha_nb += 1;
+        if is_invalid_symbol(c) {
+            symbols_nb += 1;
+        } else if valid_char(c) {
+            script_nb += 1;
         } else if c.is_numeric() {
             numeric_nb += 1;
         }
     }
-    len == 0 || len == numeric_nb || alpha_nb == 0 || numeric_nb + alpha_nb <= text.len() / 2 ||
-        (len < 5 && !valid_end_sentence(text))
+    len == 0 || len == numeric_nb || script_nb == 0 || symbols_nb > 2 || symbols_nb > script_nb ||
+        numeric_nb + script_nb <= len / 2 ||
+        (len < 5 && (symbols_nb > 0 || !valid_end_sentence(text, origin_language)))
 }
 
 fn is_title_line(text: &str, platform: &str) -> bool {
@@ -214,12 +223,13 @@ fn is_valid_time_format(time: &str) -> bool {
     re.is_match(time) && time.trim().split(':').all(|part| part.parse::<u32>().is_ok())
 }
 
-fn format_text(text: String, platform: &str) -> String {
+fn format_text(text: String, platform: &str, origin_language: &str) -> String {
     let lines = text.split("\n").map(|line| line.trim()).collect::<Vec<&str>>();
     let mut result = String::new();
     let mut i = 0;
+    let valid_char = get_char_identification_function(origin_language);
     while i < lines.len() && !is_valid_time_format(lines[i]) {
-        if !line_is_invalid(lines[i]) {
+        if !line_is_invalid(lines[i], valid_char, origin_language) {
             if is_title_line(lines[i], platform) {
                 result = String::new();
             } else {
