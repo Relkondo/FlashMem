@@ -10,18 +10,15 @@ use image::RgbaImage;
 use image::imageops::crop_imm;
 use regex::Regex;
 use crate::SettingsState;
-use crate::utils::{get_google_language_code, get_platform_cropping, get_request_google_ocr, get_request_google_translate, get_tesseract_language_code};
+use crate::utils::{get_google_language_code, get_platform_cropping, get_request_google_ocr, get_request_google_translate};
 use xcap::Monitor;
 use crate::execute::vision_response::VisionResponse;
 use base64::{Engine as _, engine::general_purpose};
-use tesseract::Tesseract;
 use crate::execute::identify_character::get_char_identification_function;
 use crate::execute::saved_sub::SavedSub;
-use crate::execute::tesseract_originated_error::TesseractOriginatedError;
 
 mod translation_response;
 mod vision_response;
-mod tesseract_originated_error;
 pub(crate) mod saved_sub;
 mod identify_character;
 
@@ -37,7 +34,7 @@ pub(crate) fn execute(settings: MutexGuard<SettingsState>) -> SavedSub {
     let image_data = crop_screenshot(screenshot.clone(), settings.platform.as_str());
     println!("Screenshot cropped in {}ms.", step2.elapsed().as_millis());
     let step3 = Instant::now();
-    let origin_text = execute_ocr(image_data, settings.platform.as_str(), &settings.origin_language).expect("Couldn't execute OCR.");
+    let origin_text = execute_ocr(image_data, &settings.origin_language).expect("Couldn't execute OCR.");
     println!("Text extracted in {}ms.", step3.elapsed().as_millis());
     let step4 = Instant::now();
     let formatted_text = format_text(origin_text, settings.platform.as_str(),  &settings.origin_language);
@@ -105,12 +102,6 @@ fn crop_screenshot(screenshot: RgbaImage, platform: &str) -> RgbaImage {
     cropped_image
 }
 
-fn encode_as_tiff(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
-    let mut bytes_tiff: Vec<u8> = Vec::new();
-    image.write_to(&mut Cursor::new(&mut bytes_tiff), image::ImageOutputFormat::Tiff)?;
-    Ok(bytes_tiff)
-}
-
 fn encode_as_webp(image: &RgbaImage) -> Result<Vec<u8>, image::ImageError> {
     let mut bytes: Vec<u8> = Vec::new();
     image.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::WebP)?;
@@ -148,40 +139,14 @@ async fn execute_google_vision_ocr(file: &RgbaImage, lang: &String) -> Result<St
     }
 }
 
-fn get_tesseract_result(file: &RgbaImage, lang: &String) -> Result<String, TesseractOriginatedError> {
-    let code = get_tesseract_language_code(lang.as_str());
-    let tesseract: Tesseract = Tesseract::new(None, Some(code)).unwrap();
-    Ok(tesseract.set_image_from_mem(&encode_as_tiff(file)?)?.set_source_resolution(264).get_text()?)
-}
-
-fn execute_tesseract_ocr(file: &RgbaImage, lang: &String) -> Option<String> {
-    println!("Using Tesseract...");
-    let result = get_tesseract_result(file, lang);
-    match result {
-        Ok(text) => {
-            println!("Tesseract executed successfully. Result:");
-            println!("{}", text);
-            Some(text)
-        }
+fn execute_ocr(image_data: RgbaImage, lang: &String) -> Option<String> {
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
+    match runtime.block_on(execute_google_vision_ocr(&image_data, lang)) {
+        Ok(text) => Some(text),
         Err(e) => {
-            eprintln!("Failed to execute Tesseract: {:?}", e);
+            eprintln!("Failed to execute Google Vision: {:?}", e);
             None
         }
-    }
-}
-
-fn execute_ocr(image_data: RgbaImage, platform: &str, lang: &String) -> Option<String> {
-    if platform == "YouTube" || platform == "VLC" {
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Could not build tokio::runtime.");
-        match runtime.block_on(execute_google_vision_ocr(&image_data, lang)) {
-            Ok(text) => Some(text),
-            Err(e) => {
-                eprintln!("Failed to execute Google Vision: {:?}", e);
-                execute_tesseract_ocr(&image_data, lang)
-            }
-        }
-    } else {
-        execute_tesseract_ocr(&image_data, lang)
     }
 }
 

@@ -10,9 +10,6 @@ mod execute;
 mod utils;
 use crate::execute::saved_sub::SavedSub;
 
-static DEBUG_TESSDATA_PATH: &'static str = "../../libs/tesseract/5.3.4/share/tessdata";
-static RELEASE_TESSDATA_PATH: &'static str = "../Resources/libs/tesseract/5.3.4/share/tessdata";
-
 static IS_RUNNING: AtomicBool = AtomicBool::new(false);
 #[derive(Debug)]
 struct SettingsState {
@@ -32,29 +29,8 @@ impl Default for SettingsState {
     }
 }
 
-fn set_tessdata_prefix_release(relative_path: &str) {
-    if let Ok(exe_path) = env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let absolute_path = exe_dir.join(relative_path);
-            if let Some(absolute_path_str) = absolute_path.to_str() {
-                println!("Setting TESSDATA_PREFIX to {}", absolute_path_str);
-                env::set_var("TESSDATA_PREFIX", absolute_path_str);
-            }
-        } else {
-            eprintln!("TESSDATA_PREFIX cloud not be set: Failed to get the executable directory.");
-        }
-    } else {
-        eprintln!("TESSDATA_PREFIX cloud not be set: Failed to get the executable path.");
-    }
-    println!("$TESSDATA_PREFIX={}", env::var("TESSDATA_PREFIX").unwrap());
-}
-
 fn main() {
     let _ = fix_path_env::fix();
-    #[cfg(not(debug_assertions))]
-    set_tessdata_prefix_release(RELEASE_TESSDATA_PATH);
-    #[cfg(debug_assertions)]
-    set_tessdata_prefix_release(DEBUG_TESSDATA_PATH);
 
     tauri::Builder::default()
         .manage(SharedSettings::default())

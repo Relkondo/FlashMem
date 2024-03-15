@@ -3,7 +3,6 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
-		"custom_build": "./src-tauri/cargo_build.sh",
 		"tauri": "tauri",
 		"dev": "vite dev",
 		"build": "vite build",
