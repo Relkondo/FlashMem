@@ -105,7 +105,7 @@ pub fn get_bcp47_language_code(lang: &str) -> &'static str {
 
 pub fn get_platform_cropping(platform: &str) -> (f64, f64, f64, f64) {
     match platform {
-        "Netflix" => (0.1, 0.04, 0.8, 0.84),
+        "Netflix" => (0.1, 0.04, 0.7, 0.84),
         "Hulu" => (0.29, 0.6, 0.42, 0.37),
         "Amazon Prime Video" => (0.25, 0.04, 0.50, 0.92),
         "Disney+" => (0.15, 0.03, 0.7, 0.94),
