@@ -88,6 +88,6 @@ pub(crate) struct BoundingPoly {
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct Vertex {
-    pub(crate) x: i32,
-    pub(crate) y: i32,
+    pub(crate) x: Option<i32>,
+    pub(crate) y: Option<i32>,
 }
