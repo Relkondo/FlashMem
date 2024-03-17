@@ -81,6 +81,10 @@
 		<!--			 class="hover:text-green-500 py-4 px-5 text-center align-middle transition-colors duration-300 rounded leading-loose-->
 		<!--				{$page.url.pathname === '/advanced_settings' ? 'bg-gray-800':''}">-->
 		<!--			Advanced Settings</a>-->
+			<a href="/account"
+				 class="hover:text-green-500 py-4 px-5 text-center align-middle transition-colors duration-300 rounded leading-loose
+					{$page.url.pathname === '/account' ? 'bg-gray-800':''}">
+				Account</a>
 	</nav>
 </div>
 <div class="px-4 pt-16 pd-4 overflow-auto">
