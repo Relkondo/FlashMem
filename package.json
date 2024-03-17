@@ -42,6 +42,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@tauri-apps/api": "^1.5.3"
+		"@tauri-apps/api": "^1.5.3",
+		"firebase": "^10.9.0"
 	}
 }
