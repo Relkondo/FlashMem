@@ -7,3 +7,5 @@ export const origin_language: Writable<string> = writable("Automatic");
 export const target_language: Writable<string> = writable("English");
 export const platform: Writable<string> = writable("Default");
 export const shortcut: Writable<string> = writable("Ctrl+T");
+
+export const user: Writable<string> = writable("");

@@ -4,6 +4,7 @@
 	import { open } from '@tauri-apps/api/shell';
 	import { origin_language, target_language, platform, shortcut } from '../stores/store';
 	import { getContext } from 'svelte';
+	import { initializeApp } from "firebase/app";
 
 	const APPLE_HELP_RECORDING_SCREEN_LINK: string = 'https://support.apple.com/guide/mac-help/control-access-screen-system-audio-recording-mchld6aa7d23/mac';
 	const APPLE_HELP_NOTIFICATIONS_LINK: string = 'https://support.apple.com/fr-fr/guide/mac-help/mh40583/mac';
@@ -12,7 +13,18 @@
 	let platforms = ['Default', 'Netflix', 'Amazon Prime Video', 'AppleTV', 'Hulu', 'Max', "YouTube", "VLC"]
 	let shortcuts = ['Ctrl+T', 'Ctrl+Shift+T', 'Ctrl+Alt+T', 'Ctrl+X', 'Ctrl+Shift+X', 'Ctrl+Alt+X'];
 	let showHelpLink = false;
-	const register_shortcut: never = getContext('register_shortcut');
+	const register_shortcut: (shortcut: string) => Promise<void> = getContext('register_shortcut');
+	const firebaseConfig = {
+		apiKey: "AIzaSyBCgq-qsmF6A4LCsWDO9YgAOgVcFXaDXNw",
+		authDomain: "flashsub-1b456.firebaseapp.com",
+		projectId: "flashsub-1b456",
+		storageBucket: "flashsub-1b456.appspot.com",
+		messagingSenderId: "368028589856",
+		appId: "1:368028589856:web:d3e015ef2a6e9b78b40145",
+		measurementId: "G-82XNXVVPS9"
+	};
+	initializeApp(firebaseConfig);
+
 
 
 	function handleOriginLanguageSelected(event: CustomEvent) {
